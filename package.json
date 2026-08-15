@@ -1,0 +1,12 @@
+{
+  "name": "video-digest-ai",
+  "version": "0.2.1",
+  "private": true,
+  "description": "Turn YouTube and Bilibili videos into transcripts, bilingual learning resources, AI overviews, explanations, and timestamped notes.",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "check": "bash scripts/check.sh",
+    "package": "bash scripts/package.sh"
+  }
+}
