@@ -1388,6 +1388,7 @@ async function loadNotes() {
     action: "getNotes",
     site: state.site,
     bvid: state.notesScope === "video" ? state.bvid : null,
+    scope: state.notesScope,
   });
   renderNotes(result?.notes || []);
 }
@@ -1460,7 +1461,14 @@ function renderNotes(notes) {
 
   const list = el("notesList");
   list.textContent = "";
-  for (const note of notes) list.appendChild(renderNoteCard(note));
+  for (const note of notes) list.appendChild(renderAnyNote(note));
+}
+
+function renderAnyNote(note) {
+  if (["memo", "ai_note", "ai_chat"].includes(note.kind)) {
+    return renderMemoCard(note, { ai: note.kind !== "memo" });
+  }
+  return renderNoteCard(note);
 }
 
 function renderNoteCard(note) {

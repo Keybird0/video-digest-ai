@@ -655,8 +655,8 @@ body {
 }
 
 .memo-panel .memo-list {
-  /* 与编辑框在 composer 内的 12px 缩进一致。 */
-  padding: 0 12px 8px;
+  /* 记录卡片与上方输入框的外框保持同一条左右边线。 */
+  padding: 0 0 8px;
 }
 
 .memo-composer textarea:focus {

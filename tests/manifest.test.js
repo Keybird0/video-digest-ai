@@ -228,6 +228,20 @@ test("笔记页提供手记和 AI 记两个独立栏目", () => {
   assert.match(background, /timestampedUrl:\s*canonicalVideoUrl/);
 });
 
+test("笔记范围按本视频、手记、AI 记、全部排列，全部视图汇总所有笔记类型", () => {
+  const html = readText("sidepanel.html");
+  const sidepanel = readText("sidepanel.js");
+  const background = readText("background.js");
+  const order = ["notesScopeVideo", "notesScopeMemo", "notesScopeAi", "notesScopeAll"];
+  const positions = order.map((id) => html.indexOf(`id="${id}"`));
+  assert.ok(positions.every((position) => position >= 0));
+  assert.deepEqual([...positions].sort((a, b) => a - b), positions);
+  assert.match(sidepanel, /scope:\s*state\.notesScope/);
+  assert.match(sidepanel, /function renderAnyNote\(note\)/);
+  assert.match(background, /if \(scope === "all"\)/);
+  assert.match(background, /notes,\s*totalCount: notes\.length/);
+});
+
 test("侧栏脚本引用的固定节点全部存在，聊天空态不会被消息重绘删除", () => {
   const html = readText("sidepanel.html");
   const sidepanel = readText("sidepanel.js");

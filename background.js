@@ -267,7 +267,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message?.action === "getNotes") {
-    handleGetNotes(message.bvid, message.site)
+    handleGetNotes(message.bvid, message.site, message.scope)
       .then(sendResponse)
       .catch((error) => sendResponse({ success: false, error: error.message }));
     return true;
@@ -1431,8 +1431,15 @@ async function handleSaveNote({
   return { success: true, note };
 }
 
-async function handleGetNotes(videoIdInput, site = "bilibili") {
+async function handleGetNotes(videoIdInput, site = "bilibili", scope = "video") {
   const notes = await readNotes();
+  if (scope === "all") {
+    return {
+      success: true,
+      notes,
+      totalCount: notes.length,
+    };
+  }
   const regularNotes = notes.filter(
     (note) => !["memo", "ai_note", "ai_chat"].includes(note.kind),
   );
