@@ -126,6 +126,13 @@ test("字幕服务提供独立保存入口", () => {
   assert.match(script, /字幕服务密钥已保存/);
 });
 
+test("模型配置保存按钮使用明确文案", () => {
+  const html = readText("options.html");
+  const script = readText("options.js");
+  assert.match(html, /id="saveBtn"[^>]*>保存模型配置</);
+  assert.match(script, /"保存模型配置":\s*"Save model configuration"/);
+});
+
 test("设置页提供默认全开的双站点适用范围开关", () => {
   const html = readText("options.html");
   const script = readText("options.js");

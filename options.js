@@ -63,7 +63,7 @@ const EN_TEXT = Object.freeze({
   "两个 Provider 共用此并发上限，默认 3。": "Both providers share this limit; default: 3.",
   "单次请求超时（秒）": "Request timeout (seconds)",
   "主服务超时后会尝试备用服务。": "The backup is tried after a primary timeout.",
-  "保存并授权两个服务": "Save and authorize providers",
+  "保存模型配置": "Save model configuration",
   "保存时 Chrome 会一次性请求当前启用的 Provider 域名权限。仅在网络错误、超时、HTTP 408/409/425/429 或 5xx 时切换；密钥错误、模型错误和请求格式错误不会自动转到备用服务。": "Chrome requests host access for all enabled providers in one step. Failover occurs only for network errors, timeouts, HTTP 408/409/425/429, or 5xx responses; key, model, and request-format errors never trigger it.",
   "获取密钥 →": "Get API key →",
   "正在拉取模型…": "Fetching models…",
