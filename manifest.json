@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Video Digest AI",
-  "version": "0.2.2",
+  "version": "1.0.0",
   "minimum_chrome_version": "116",
   "description": "把 YouTube 与 Bilibili 视频变成学习资源：字幕、双语对照、AI 概览、视频问答和时间戳笔记。",
   "permissions": ["sidePanel", "storage", "tabs"],
