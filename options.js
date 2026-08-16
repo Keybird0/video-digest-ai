@@ -12,7 +12,7 @@ const EN_TEXT = Object.freeze({
   "修改后自动保存，并同步到已打开的视频页。": "Changes are saved automatically and applied to open video pages.",
   "适用范围已保存": "Site availability saved",
   "YouTube 字幕服务": "YouTube caption services",
-  "Bilibili 字幕直接读取平台接口。YouTube 可配置多个字幕服务商，按从上到下的顺序尝试；上一项失败后才会请求下一项。": "Bilibili captions are read from the platform API. Configure multiple YouTube caption providers; they are tried from top to bottom, and the next provider is requested only after the previous one fails.",
+  "Bilibili 字幕直接读取平台接口。YouTube 可配置多个字幕服务商，按从上到下的顺序尝试；上一项失败后才会请求下一项。可直接拖动卡片调整顺序。": "Bilibili captions are read from the platform API. Configure multiple YouTube caption providers; they are tried from top to bottom, and the next provider is requested only after the previous one fails. Drag cards to reorder them.",
   "添加字幕服务商": "Add caption provider",
   "保存字幕服务商": "Save caption providers",
   "API Key 仅保存在本机扩展存储，且只会发送给对应服务商。保存时 Chrome 会请求已配置服务商的域名访问权限。": "API keys are stored only in local extension storage and sent only to their matching provider. Saving requests Chrome host access for configured provider domains.",
@@ -176,6 +176,7 @@ let overviewPrompts = BILI_SETTINGS.normalizeOverviewPrompts();
 let youtubeCaptionProviders = BILI_SETTINGS.normalizeYoutubeCaptionProviders();
 let aiProviders = BILI_SETTINGS.normalizeAiProviders();
 let draggedAiProviderId = "";
+let draggedCaptionProviderIndex = -1;
 
 const statusTimers = new WeakMap();
 
@@ -893,12 +894,18 @@ function renderCaptionProviders(input = youtubeCaptionProviders) {
     header.className = "caption-provider-header";
     const title = document.createElement("div");
     title.className = "caption-provider-title";
+    const dragHandle = document.createElement("span");
+    dragHandle.className = "caption-provider-drag-handle";
+    dragHandle.textContent = "⠿";
+    dragHandle.draggable = true;
+    dragHandle.title = translateText("拖动排序");
+    dragHandle.setAttribute("aria-label", translateText("拖动排序"));
     const order = document.createElement("span");
     order.className = "caption-provider-order";
     order.textContent = String(index + 1);
     const label = document.createElement("strong");
     label.textContent = translateText("字幕服务商");
-    title.append(order, label);
+    title.append(dragHandle, order, label);
 
     const controls = document.createElement("div");
     controls.className = "caption-provider-controls";
@@ -973,6 +980,7 @@ function renderCaptionProviders(input = youtubeCaptionProviders) {
     info.append(infoTitle, detail, links);
 
     card.append(header, providerField, keyField, info);
+    wireCaptionProviderDrag(card, dragHandle, index);
     captionProviderList.appendChild(card);
   });
 }
@@ -983,6 +991,45 @@ function moveCaptionProvider(index, direction) {
   if (target < 0 || target >= providers.length) return;
   [providers[index], providers[target]] = [providers[target], providers[index]];
   renderCaptionProviders(providers);
+}
+
+function moveCaptionProviderByIndex(sourceIndex, targetIndex) {
+  if (sourceIndex === targetIndex || sourceIndex < 0 || targetIndex < 0) return;
+  const providers = readCaptionProviders();
+  if (sourceIndex >= providers.length || targetIndex >= providers.length) return;
+  const [source] = providers.splice(sourceIndex, 1);
+  providers.splice(targetIndex, 0, source);
+  renderCaptionProviders(providers);
+}
+
+function wireCaptionProviderDrag(card, handle, index) {
+  handle.addEventListener("dragstart", (event) => {
+    draggedCaptionProviderIndex = index;
+    card.classList.add("dragging");
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", String(index));
+  });
+  handle.addEventListener("dragend", () => {
+    draggedCaptionProviderIndex = -1;
+    document.querySelectorAll(".caption-provider-card.dragging, .caption-provider-card.drag-over")
+      .forEach((element) => element.classList.remove("dragging", "drag-over"));
+  });
+  card.addEventListener("dragover", (event) => {
+    if (draggedCaptionProviderIndex < 0 || draggedCaptionProviderIndex === index) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    card.classList.add("drag-over");
+  });
+  card.addEventListener("dragleave", () => card.classList.remove("drag-over"));
+  card.addEventListener("drop", (event) => {
+    event.preventDefault();
+    const draggedValue = event.dataTransfer?.getData("text/plain") || "";
+    const sourceIndex = /^\d+$/.test(draggedValue)
+      ? Number(draggedValue)
+      : draggedCaptionProviderIndex;
+    card.classList.remove("drag-over");
+    moveCaptionProviderByIndex(sourceIndex, index);
+  });
 }
 
 function removeCaptionProvider(index) {

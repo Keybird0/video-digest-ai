@@ -386,6 +386,16 @@ select {
   border: 1px solid var(--border);
   border-radius: 9px;
   background: color-mix(in srgb, var(--bg) 72%, var(--card));
+  transition: border-color 120ms ease, opacity 120ms ease, transform 120ms ease;
+}
+
+.caption-provider-card.drag-over {
+  border-color: var(--accent);
+  transform: translateY(2px);
+}
+
+.caption-provider-card.dragging {
+  opacity: 0.45;
 }
 
 .caption-provider-header,
@@ -422,6 +432,22 @@ select {
   font-weight: 700;
   border-radius: 50%;
   background: var(--accent);
+}
+
+.caption-provider-drag-handle {
+  display: inline-grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: grab;
+  user-select: none;
+}
+
+.caption-provider-drag-handle:active {
+  cursor: grabbing;
 }
 
 .caption-provider-control {

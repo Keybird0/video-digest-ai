@@ -46,7 +46,7 @@
 
 ## YouTube 字幕服务商
 
-设置页默认提供一个 Supadata 项，可通过“添加字幕服务商”继续添加 Captapi、TranscriptFetch 或 TranscriptAPI。填写各自的 API Key 后，可用“上移 / 下移”调整顺序；请求按从上到下的顺序执行，只有前一项失败才尝试后一项。密钥仅保存在 `chrome.storage.local`，并且仅发送至所属服务商域名。
+设置页默认提供一个 Supadata 项，可通过“添加字幕服务商”继续添加 Captapi、TranscriptFetch 或 TranscriptAPI。填写各自的 API Key 后，可直接拖动卡片或使用“上移 / 下移”调整顺序；请求按从上到下的顺序执行，只有前一项失败才尝试后一项。密钥仅保存在 `chrome.storage.local`，并且仅发送至所属服务商域名。
 
 - [Supadata](https://docs.supadata.ai/get-transcript)：扩展固定使用 `mode=native`，只取已有字幕。
 - [Captapi](https://captapi.com/how-to/youtube-transcript)：返回 YouTube 已发布的带时间戳字幕。

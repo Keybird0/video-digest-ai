@@ -127,6 +127,8 @@ test("字幕服务商支持多项配置、排序回退与独立保存", () => {
   assert.match(html, /id="captionProviderList"/);
   assert.match(script, /renderCaptionProviders/);
   assert.match(script, /moveCaptionProvider/);
+  assert.match(script, /wireCaptionProviderDrag/);
+  assert.match(script, /caption-provider-drag-handle/);
   assert.match(script, /saveCaptionProviders/);
   assert.match(settings, /captapi/);
   assert.match(settings, /transcriptfetch/);
