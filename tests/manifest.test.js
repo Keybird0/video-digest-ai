@@ -256,6 +256,14 @@ test("问 AI 可按需关联字幕、概览和笔记，所有笔记都支持再�
   assert.match(sidepanel, /action:\s*"updateNote"/);
 });
 
+test("笔记栏目复用安全 Markdown 渲染器", () => {
+  const sidepanel = readText("sidepanel.js");
+  const css = readText("sidepanel.css");
+  assert.match(sidepanel, /BILI_MARKDOWN\.render\(text, note\.text, document\)/);
+  assert.match(sidepanel, /BILI_MARKDOWN\.render\(text, memo\.text, document\)/);
+  assert.match(css, /\.note \.entry-text\.markdown-body/);
+});
+
 test("字幕和概览章节均提供一键存为笔记，提示词恢复按钮等宽", () => {
   const script = readText("sidepanel.js");
   const css = readText("sidepanel.css");

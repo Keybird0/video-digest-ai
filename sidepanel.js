@@ -1797,9 +1797,11 @@ function renderNoteCard(note) {
   }
   head.appendChild(remove);
 
-  const text = document.createElement("p");
-  text.className = "entry-text";
-  text.textContent = note.text;
+  // 笔记与问 AI 共用同一套安全 Markdown 渲染器；原始文本仍保留在
+  // note.text，供编辑、复制和本地导出使用。
+  const text = document.createElement("div");
+  text.className = "entry-text markdown-body";
+  BILI_MARKDOWN.render(text, note.text, document);
 
   const away =
     (note.site || "bilibili") !== (state.site || "bilibili") ||
@@ -1882,9 +1884,10 @@ function renderMemoCard(memo, { ai = false } = {}) {
   }
   head.appendChild(remove);
 
-  const text = document.createElement("p");
-  text.className = "entry-text";
-  text.textContent = memo.text;
+  // 手记与 AI 记也支持 Markdown，避免同一份已保存内容在不同栏目展示不一致。
+  const text = document.createElement("div");
+  text.className = "entry-text markdown-body";
+  BILI_MARKDOWN.render(text, memo.text, document);
 
   const meta = document.createElement("p");
   meta.className = "note-meta";

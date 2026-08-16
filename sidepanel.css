@@ -601,11 +601,11 @@ body {
 }
 
 /* 笔记正文是从视频里摘下来的一句话，加引号跟自己写的批注区分开 */
-.note:not(.note-ai-chat):not(.note-memo) .entry-text::before {
+.note:not(.note-ai-chat):not(.note-memo) .entry-text:not(.markdown-body)::before {
   content: "“";
 }
 
-.note:not(.note-ai-chat):not(.note-memo) .entry-text::after {
+.note:not(.note-ai-chat):not(.note-memo) .entry-text:not(.markdown-body)::after {
   content: "”";
 }
 
@@ -713,6 +713,11 @@ body {
 .note-memo .entry-text {
   color: var(--text);
   white-space: pre-wrap;
+}
+
+/* 笔记正文由安全 Markdown 渲染器生成块级元素，沿用问 AI 的排版规则。 */
+.note .entry-text.markdown-body {
+  white-space: normal;
 }
 
 .note-editor {
