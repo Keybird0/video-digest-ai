@@ -128,6 +128,16 @@ const SIDE_PANEL_EN = Object.freeze({
   "导出为 JSON": "Export as JSON",
   "导出为 Markdown": "Export as Markdown",
   "导出为 CSV": "Export as CSV",
+  "同步全部笔记": "Sync all notes",
+  "同步飞书": "sync2lark",
+  "将全部笔记逐条同步到飞书": "Sync all notes to Lark, one record per request",
+  "将这条笔记同步到飞书": "Sync this note to Lark",
+  "正在同步…": "Syncing…",
+  "已同步": "Synced",
+  "同步失败": "Sync failed",
+  "请先在设置中保存飞书多维表格 Webhook。": "Save a Lark Bitable Webhook in Settings first.",
+  "没有可同步的笔记。": "There are no notes to sync.",
+  "正在同步飞书": "Syncing to Lark",
   "访问锚点": "Open timestamp",
   "已保存，并记录当前视频访问锚点。":
     "Saved with the current video timestamp.",
@@ -159,6 +169,9 @@ function uiText(text) {
           [/^(\d+) 条命中$/, "$1 matches"],
           [/^(\d+) 块失败，结果不完整$/, "$1 chunks failed; result incomplete"],
           [/^已保存$/, "Saved"],
+          [/^已同步 (\d+) 条笔记。$/, "$1 notes synced."],
+          [/^已同步 (\d+) 条，(\d+) 条失败。$/, "$1 notes synced; $2 failed."],
+          [/^正在同步飞书 (\d+)\/(\d+)…$/, "Syncing to Lark $1/$2…"],
         ]
       : [
           [/^(\d+) segments$/, "$1 段"],
@@ -168,6 +181,9 @@ function uiText(text) {
           [/^(\d+) matches$/, "$1 条命中"],
           [/^(\d+) chunks failed; result incomplete$/, "$1 块失败，结果不完整"],
           [/^Saved$/, "已保存"],
+          [/^(\d+) notes synced\.$/, "已同步 $1 条笔记。"],
+          [/^(\d+) notes synced; (\d+) failed\.$/, "已同步 $1 条，$2 条失败。"],
+          [/^Syncing to Lark (\d+)\/(\d+)…$/, "正在同步飞书 $1/$2…"],
         ];
   return replacements.reduce(
     (result, [pattern, replacement]) => result.replace(pattern, replacement),
@@ -1544,6 +1560,47 @@ function setNotesExportButtonsDisabled(disabled) {
   }
 }
 
+function larkSyncMessage(result) {
+  if (result?.success) return `已同步 ${result.synced || 0} 条笔记。`;
+  if (result?.synced) return `已同步 ${result.synced} 条，${result.failed || 0} 条失败。`;
+  if (result?.error === "LARK_WEBHOOK_NOT_CONFIGURED") {
+    return "请先在设置中保存飞书多维表格 Webhook。";
+  }
+  if (result?.error === "NO_NOTES") return "没有可同步的笔记。";
+  return result?.message || "同步失败";
+}
+
+async function syncNotesToLark(noteIds, button) {
+  let result;
+  try {
+    result = await chrome.runtime.sendMessage({ action: "syncNotesToLark", noteIds });
+  } catch (error) {
+    result = { success: false, message: error.message };
+  }
+  if (button) {
+    flashActionButton(button, result?.success ? "已同步" : "同步失败");
+    if (!result?.success) button.title = uiText(larkSyncMessage(result));
+  }
+  return result;
+}
+
+async function syncAllNotesToLark() {
+  const button = el("syncAllNotesLarkBtn");
+  const status = el("larkSyncStatus");
+  button.disabled = true;
+  button.textContent = uiText("正在同步…");
+  status.textContent = "";
+  try {
+    const result = await syncNotesToLark(undefined);
+    status.textContent = uiText(larkSyncMessage(result));
+  } catch (error) {
+    status.textContent = uiText("同步失败");
+  } finally {
+    button.disabled = false;
+    button.textContent = uiText("同步飞书");
+  }
+}
+
 function noteKindLabel(kind) {
   if (state.uiLanguage === "en") {
     if (kind === "memo") return "Memo";
@@ -1770,6 +1827,12 @@ function renderNoteCard(note) {
         flashActionButton(button, "已复制");
       },
     }),
+    actionButton({
+      iconName: "external",
+      label: "同步飞书",
+      title: "将这条笔记同步到飞书",
+      onClick: (button) => syncNotesToLark([note.id], button),
+    }),
   );
 
   card.append(head, text, meta, actions, notice);
@@ -1837,6 +1900,14 @@ function renderMemoCard(memo, { ai = false } = {}) {
         await navigator.clipboard.writeText(memo.text);
         flashActionButton(button, "已复制");
       },
+    }),
+  );
+  actions.appendChild(
+    actionButton({
+      iconName: "external",
+      label: "同步飞书",
+      title: "将这条笔记同步到飞书",
+      onClick: (button) => syncNotesToLark([memo.id], button),
     }),
   );
 
@@ -2202,6 +2273,7 @@ function setupEventListeners() {
     exportNotes("markdown"),
   );
   el("exportNotesCsvBtn").addEventListener("click", () => exportNotes("csv"));
+  el("syncAllNotesLarkBtn").addEventListener("click", syncAllNotesToLark);
   el("memoForm").addEventListener("submit", (event) => {
     event.preventDefault();
     saveMemo();
@@ -2283,6 +2355,16 @@ function setupEventListeners() {
     if (message?.action === "noteSaved" && state.tab === "notes") loadNotes();
     // 笔记先存原始字幕、润色好了再替换正文，所以还有第二次刷新。
     if (message?.action === "noteUpdated" && state.tab === "notes") loadNotes();
+    if (message?.action === "larkSyncProgress") {
+      el("larkSyncStatus").textContent = uiText(
+        `正在同步飞书 ${message.done}/${message.total}…`,
+      );
+    }
+    if (message?.action === "larkAutoSyncResult" && state.tab === "notes") {
+      el("larkSyncStatus").textContent = uiText(
+        message.success ? "已同步 1 条笔记。" : "同步失败",
+      );
+    }
     // 概览的分块在 background 里跑，进度只能靠它广播回来。
     if (message?.action === "aiProgress") {
       showProgress(message.kind, message.done, message.total);
