@@ -119,7 +119,6 @@ const SIDE_PANEL_EN = Object.freeze({
   "概览生成失败": "Overview generation failed",
   "概览提示词（可调整）": "Overview prompt (editable)",
   "恢复中文默认": "Restore Chinese default",
-  "恢复英文默认": "Restore English default",
   "修改会自动保存在本机，并用于下一次生成。":
     "Changes are saved locally and used for the next generation.",
   "已自动保存": "Saved automatically",
@@ -230,6 +229,8 @@ const state = {
   chatSending: false,
   notesForExport: [],
   overviewPrompts: { ...BILI_SETTINGS.DEFAULT_OVERVIEW_PROMPTS },
+  // 提示词的编辑语言可独立于侧栏界面语言；例如中文界面也能直接维护英文模板。
+  overviewPromptLanguage: "zh-CN",
 };
 
 const el = (id) => document.getElementById(id);
@@ -1169,8 +1170,12 @@ const OVERVIEW_EMPTY_TEXT =
   "把整段字幕交给大模型，产出覆盖全片的章节和 3-5 条金句。需要先在设置页配置 AI 服务。";
 let overviewPromptSaveTimer = null;
 
+function normalizeOverviewPromptLanguage(language) {
+  return language === "en" ? "en" : "zh-CN";
+}
+
 function renderOverviewPrompt() {
-  const language = state.uiLanguage === "en" ? "en" : "zh-CN";
+  const language = normalizeOverviewPromptLanguage(state.overviewPromptLanguage);
   el("overviewPrompt").value =
     state.overviewPrompts[language] ||
     BILI_SETTINGS.DEFAULT_OVERVIEW_PROMPTS[language];
@@ -1188,7 +1193,7 @@ async function persistOverviewPrompts() {
 }
 
 function updateOverviewPrompt() {
-  const language = state.uiLanguage === "en" ? "en" : "zh-CN";
+  const language = normalizeOverviewPromptLanguage(state.overviewPromptLanguage);
   const value = el("overviewPrompt").value.trim();
   state.overviewPrompts[language] =
     value || BILI_SETTINGS.DEFAULT_OVERVIEW_PROMPTS[language];
@@ -1197,12 +1202,11 @@ function updateOverviewPrompt() {
 }
 
 function resetOverviewPrompt(language) {
-  const targetLanguage = language === "en" ? "en" : "zh-CN";
+  const targetLanguage = normalizeOverviewPromptLanguage(language);
   state.overviewPrompts[targetLanguage] =
     BILI_SETTINGS.DEFAULT_OVERVIEW_PROMPTS[targetLanguage];
-  if ((state.uiLanguage === "en" ? "en" : "zh-CN") === targetLanguage) {
-    renderOverviewPrompt();
-  }
+  state.overviewPromptLanguage = targetLanguage;
+  renderOverviewPrompt();
   clearTimeout(overviewPromptSaveTimer);
   persistOverviewPrompts();
 }
@@ -2216,6 +2220,7 @@ function setupEventListeners() {
     if (message?.action === "siteScopeChanged") syncWithActiveTab({ force: true });
     if (message?.action === "uiLanguageChanged") {
       state.uiLanguage = message.uiLanguage === "en" ? "en" : "zh-CN";
+      state.overviewPromptLanguage = state.uiLanguage;
       applySidepanelLanguage();
       renderOverviewPrompt();
       if (state.analysis && state.analysisLanguage !== state.uiLanguage) {
@@ -2248,6 +2253,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   );
   state.uiLanguage = settings.uiLanguage;
   state.overviewPrompts = { ...settings.overviewPrompts };
+  state.overviewPromptLanguage = state.uiLanguage;
   applySidepanelLanguage();
   renderOverviewPrompt();
   state.windowId = (await chrome.windows.getCurrent()).id;

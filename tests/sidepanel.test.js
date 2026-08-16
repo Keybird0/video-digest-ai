@@ -138,7 +138,7 @@ function createContext({
         onUpdated: { addListener() {} },
       },
       windows: { getCurrent: async () => ({ id: 1 }) },
-      storage: { local: { get: async () => ({}) } },
+      storage: { local: { get: async () => ({}), set: async () => {} } },
     },
     BILI_TRANSCRIPT: require("../lib/transcript.js"),
     BILI_AI: require("../lib/ai.js"),
@@ -153,7 +153,7 @@ function createContext({
   // 所以在末尾追加一行，从同一个词法作用域里把要测的绑定递出来。
   const source = fs.readFileSync(path.join(ROOT, "sidepanel.js"), "utf8");
   vm.runInContext(
-    `${source}\n;globalThis.__api = { state, uiText, parseVideoRef, activeTab, syncWithActiveTab, loadTranscript, analyze, segmentDisplayText, paintSegmentText, setTranscriptMode, selectionContext, applySearchFilter, updateFollowPill, jumpToActive, closeSearch, renderNoteCard, renderMemoCard, playNote, saveMemo, currentMemoVideoContext, submitChatQuestion, saveChatAsNote, renderChat, switchTab };`,
+    `${source}\n;globalThis.__api = { state, uiText, parseVideoRef, activeTab, syncWithActiveTab, loadTranscript, analyze, segmentDisplayText, paintSegmentText, setTranscriptMode, selectionContext, applySearchFilter, updateFollowPill, jumpToActive, closeSearch, renderNoteCard, renderMemoCard, playNote, saveMemo, currentMemoVideoContext, submitChatQuestion, saveChatAsNote, renderChat, switchTab, renderOverviewPrompt, resetOverviewPrompt };`,
     context,
   );
 
@@ -189,6 +189,26 @@ test("英文界面会翻译侧边栏菜单和动态计数", () => {
   assert.equal(ctx.uiText("问 AI"), "Ask AI");
   assert.equal(ctx.uiText("7 章节"), "7 chapters");
   assert.equal(ctx.uiText("5 金句"), "5 key quotes");
+});
+
+test("概览提示词可在中文界面切换为英文默认版本", () => {
+  const ctx = createContext({ transcript: transcriptResult() });
+  const defaults = require("../settings.js").DEFAULT_OVERVIEW_PROMPTS;
+  ctx.state.uiLanguage = "zh-CN";
+  ctx.state.overviewPrompts = {
+    "zh-CN": "保留的中文自定义提示词",
+    en: "Existing English prompt",
+  };
+
+  ctx.resetOverviewPrompt("en");
+
+  assert.equal(ctx.state.overviewPromptLanguage, "en");
+  assert.equal(ctx.el("overviewPrompt").value, defaults.en);
+  assert.equal(ctx.state.overviewPrompts["zh-CN"], "保留的中文自定义提示词");
+
+  ctx.resetOverviewPrompt("zh-CN");
+  assert.equal(ctx.state.overviewPromptLanguage, "zh-CN");
+  assert.equal(ctx.el("overviewPrompt").value, defaults["zh-CN"]);
 });
 
 function transcriptResult(extra = {}) {
