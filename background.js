@@ -287,6 +287,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message?.action === "deleteNotes") {
+    handleDeleteNotes(message.noteIds)
+      .then(sendResponse)
+      .catch((error) => sendResponse({ success: false, error: error.message }));
+    return true;
+  }
+
+  if (message?.action === "clearNotes") {
+    handleClearNotes(message)
+      .then(sendResponse)
+      .catch((error) => sendResponse({ success: false, error: error.message }));
+    return true;
+  }
+
   if (message?.action === "updateNote") {
     handleUpdateNote(message.noteId, message.text)
       .then(sendResponse)
@@ -1647,6 +1661,50 @@ async function handleGetMemos(kind, page) {
 async function handleDeleteNote(noteId) {
   await mutateNotes((notes) => notes.filter((note) => note.id !== noteId));
   return { success: true };
+}
+
+async function handleDeleteNotes(noteIds) {
+  const ids = new Set(
+    Array.isArray(noteIds)
+      ? noteIds.filter((noteId) => typeof noteId === "string" && noteId)
+      : [],
+  );
+  if (!ids.size) return { success: false, error: "EMPTY_SELECTION", message: "请先选择笔记。" };
+  let deletedCount = 0;
+  await mutateNotes((notes) =>
+    notes.filter((note) => {
+      const matched = ids.has(note.id);
+      if (matched) deletedCount += 1;
+      return !matched;
+    }),
+  );
+  return { success: true, deletedCount };
+}
+
+function noteMatchesScope(note, { site, bvid, scope }) {
+  if (scope === "all") return true;
+  if (scope === "memo") return note.kind === "memo";
+  if (scope === "ai") return note.kind === "ai_note" || note.kind === "ai_chat";
+  if (scope !== "video") return false;
+  const resource = bvid ? resolveVideo(site, bvid) : null;
+  return Boolean(
+    resource &&
+      !["memo", "ai_note", "ai_chat"].includes(note.kind) &&
+      (note.site || "bilibili") === resource.site &&
+      note.bvid === resource.videoId,
+  );
+}
+
+async function handleClearNotes({ site = "bilibili", bvid, scope = "video" }) {
+  let deletedCount = 0;
+  await mutateNotes((notes) =>
+    notes.filter((note) => {
+      const matched = noteMatchesScope(note, { site, bvid, scope });
+      if (matched) deletedCount += 1;
+      return !matched;
+    }),
+  );
+  return { success: true, deletedCount };
 }
 
 async function handleUpdateNote(noteId, text) {

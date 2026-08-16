@@ -226,7 +226,17 @@
           <button id="notesScopeAi" class="segmented-btn">AI 记</button>
           <button id="notesScopeAll" class="segmented-btn">全部</button>
         </div>
+        <button id="toggleNotesDeleteModeBtn" class="ghost-btn notes-delete-toggle" type="button">删除</button>
         <span id="notesCount" class="muted"></span>
+      </div>
+      <div id="notesDeleteBar" class="notes-delete-bar" hidden>
+        <span id="notesSelectionCount" class="muted">已选 0 条</span>
+        <div class="notes-delete-actions">
+          <button id="selectVisibleNotesBtn" class="ghost-btn" type="button">全选已加载</button>
+          <button id="deleteSelectedNotesBtn" class="ghost-btn danger-btn" type="button" disabled>删除所选</button>
+          <button id="clearCurrentNotesBtn" class="ghost-btn danger-btn" type="button">清空当前范围</button>
+          <button id="cancelNotesDeleteModeBtn" class="ghost-btn" type="button">取消</button>
+        </div>
       </div>
       <div class="notes-export-bar">
         <span class="muted">导出当前范围</span>

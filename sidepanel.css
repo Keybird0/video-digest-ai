@@ -332,6 +332,51 @@ body {
   opacity: 0.45;
 }
 
+.notes-delete-toggle {
+  margin-left: auto;
+}
+
+.notes-delete-toggle.active,
+.danger-btn {
+  color: #c73552;
+  border-color: #efb8c5;
+}
+
+.danger-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.notes-delete-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 14px;
+  background: #fff8fa;
+  border-bottom: 1px solid var(--border);
+}
+
+.notes-delete-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.notes-delete-actions .ghost-btn {
+  padding: 3px 7px;
+  font-size: 11px;
+}
+
+.note-selection {
+  width: 16px;
+  height: 16px;
+  margin: 0 8px 0 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 .notes-pagination {
   display: flex;
   justify-content: center;

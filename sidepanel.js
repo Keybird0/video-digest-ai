@@ -111,6 +111,13 @@ const SIDE_PANEL_EN = Object.freeze({
   "删除这条笔记": "Delete this note",
   "删除这条手记": "Delete this memo",
   "删除这条 AI 记": "Delete this AI note",
+  "删除": "Delete",
+  "选择这条笔记": "Select this note",
+  "已选": "Selected",
+  "全选已加载": "Select loaded",
+  "取消全选已加载": "Deselect loaded",
+  "删除所选": "Delete selected",
+  "清空当前范围": "Clear current scope",
   "跳到这个时间点": "Jump to this timestamp",
   "在新标签页打开原视频并跳到这一刻":
     "Open the original video at this timestamp in a new tab",
@@ -169,6 +176,7 @@ function uiText(text) {
           [/^(\d+) 金句$/, "$1 key quotes"],
           [/^(\d+) 条$/, "$1 items"],
           [/^(\d+) 条命中$/, "$1 matches"],
+          [/^已选 (\d+) 条$/, "$1 selected"],
           [/^已显示 (\d+) \/ 共 (\d+) 条$/, "Showing $1 of $2"],
           [/^(\d+) 块失败，结果不完整$/, "$1 chunks failed; result incomplete"],
           [/^已保存$/, "Saved"],
@@ -179,6 +187,7 @@ function uiText(text) {
           [/^(\d+) key quotes$/, "$1 金句"],
           [/^(\d+) items$/, "$1 条"],
           [/^(\d+) matches$/, "$1 条命中"],
+          [/^(\d+) selected$/, "已选 $1 条"],
           [/^Showing (\d+) of (\d+)$/, "已显示 $1 / 共 $2 条"],
           [/^(\d+) chunks failed; result incomplete$/, "$1 块失败，结果不完整"],
           [/^Saved$/, "已保存"],
@@ -244,6 +253,8 @@ const state = {
   notesLoaded: [],
   notesTotalCount: 0,
   notesHasMore: false,
+  notesDeleteMode: false,
+  selectedNoteIds: new Set(),
   overviewPrompts: { ...BILI_SETTINGS.DEFAULT_OVERVIEW_PROMPTS },
   // 提示词的编辑语言可独立于侧栏界面语言；例如中文界面也能直接维护英文模板。
   overviewPromptLanguage: "zh-CN",
@@ -1506,6 +1517,7 @@ function renderMemos(memos, totalCount = memos.length) {
   const list = el("memoList");
   list.textContent = "";
   for (const memo of memos) list.appendChild(renderMemoCard(memo));
+  updateNotesDeleteControls();
 }
 
 function renderAiNotes(notes, totalCount = notes.length) {
@@ -1515,6 +1527,7 @@ function renderAiNotes(notes, totalCount = notes.length) {
   const list = el("aiNotesList");
   list.textContent = "";
   for (const note of notes) list.appendChild(renderMemoCard(note, { ai: true }));
+  updateNotesDeleteControls();
 }
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -1571,6 +1584,89 @@ function renderNotes(notes, totalCount = notes.length) {
   const list = el("notesList");
   list.textContent = "";
   for (const note of notes) list.appendChild(renderAnyNote(note));
+  updateNotesDeleteControls();
+}
+
+function appendNoteSelection(head, note) {
+  if (!state.notesDeleteMode) return;
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.className = "note-selection";
+  checkbox.dataset.noteId = note.id;
+  checkbox.checked = state.selectedNoteIds.has(note.id);
+  checkbox.setAttribute("aria-label", uiText("选择这条笔记"));
+  checkbox.addEventListener("change", () => {
+    if (checkbox.checked) state.selectedNoteIds.add(note.id);
+    else state.selectedNoteIds.delete(note.id);
+    updateNotesDeleteControls();
+  });
+  head.appendChild(checkbox);
+}
+
+function updateNotesDeleteControls() {
+  const inDeleteMode = state.notesDeleteMode;
+  const selectedCount = state.selectedNoteIds.size;
+  const toggle = el("toggleNotesDeleteModeBtn");
+  const bar = el("notesDeleteBar");
+  toggle.classList.toggle("active", inDeleteMode);
+  toggle.textContent = uiText(inDeleteMode ? "取消" : "删除");
+  bar.hidden = !inDeleteMode;
+  if (!inDeleteMode) return;
+  el("notesSelectionCount").textContent = uiText(`已选 ${selectedCount} 条`);
+  const visibleIds = state.notesLoaded.map((note) => note.id);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => state.selectedNoteIds.has(id));
+  el("selectVisibleNotesBtn").textContent = uiText(allVisibleSelected ? "取消全选已加载" : "全选已加载");
+  el("deleteSelectedNotesBtn").disabled = selectedCount === 0;
+}
+
+function setNotesDeleteMode(enabled) {
+  state.notesDeleteMode = enabled;
+  state.selectedNoteIds.clear();
+  loadNotes();
+}
+
+function selectVisibleNotes() {
+  const visibleIds = state.notesLoaded.map((note) => note.id);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => state.selectedNoteIds.has(id));
+  for (const id of visibleIds) {
+    if (allVisibleSelected) state.selectedNoteIds.delete(id);
+    else state.selectedNoteIds.add(id);
+  }
+  for (const checkbox of document.querySelectorAll(".note-selection")) {
+    checkbox.checked = state.selectedNoteIds.has(checkbox.dataset.noteId);
+  }
+  updateNotesDeleteControls();
+}
+
+async function deleteSelectedNotes() {
+  const noteIds = [...state.selectedNoteIds];
+  if (!noteIds.length) return;
+  const warning = state.uiLanguage === "en"
+    ? `Delete ${noteIds.length} selected notes permanently?`
+    : `确定永久删除已选的 ${noteIds.length} 条笔记吗？`;
+  if (!globalThis.confirm(warning)) return;
+  const result = await chrome.runtime.sendMessage({ action: "deleteNotes", noteIds });
+  if (!result?.success) return;
+  state.selectedNoteIds.clear();
+  await loadNotes();
+}
+
+async function clearCurrentNotes() {
+  const totalCount = state.notesTotalCount;
+  if (!totalCount) return;
+  const warning = state.uiLanguage === "en"
+    ? `Permanently clear all ${totalCount} notes in this scope? This includes unloaded pages.`
+    : `确定永久清空当前范围的 ${totalCount} 条笔记吗？这也会删除尚未加载的分页内容。`;
+  if (!globalThis.confirm(warning)) return;
+  const result = await chrome.runtime.sendMessage({
+    action: "clearNotes",
+    site: state.site,
+    bvid: state.notesScope === "video" ? state.bvid : null,
+    scope: state.notesScope,
+  });
+  if (!result?.success) return;
+  state.selectedNoteIds.clear();
+  await loadNotes();
 }
 
 function updateNotesPagination() {
@@ -1828,6 +1924,7 @@ function renderNoteCard(note) {
 
   const head = document.createElement("div");
   head.className = "entry-head";
+  appendNoteSelection(head, note);
 
   // 时间戳做成按钮才看得出来能点。
   const time = document.createElement("button");
@@ -1841,6 +1938,7 @@ function renderNoteCard(note) {
     title: "删除这条笔记",
     onClick: async () => {
       await chrome.runtime.sendMessage({ action: "deleteNote", noteId: note.id });
+      state.selectedNoteIds.delete(note.id);
       loadNotes();
     },
   });
@@ -1919,6 +2017,7 @@ function renderMemoCard(memo, { ai = false } = {}) {
 
   const head = document.createElement("div");
   head.className = "entry-head";
+  appendNoteSelection(head, memo);
   const created = document.createElement("span");
   created.className = "memo-created";
   created.textContent = new Date(memo.createdAt).toLocaleString(
@@ -1929,6 +2028,7 @@ function renderMemoCard(memo, { ai = false } = {}) {
     title: ai ? "删除这条 AI 记" : "删除这条手记",
     onClick: async () => {
       await chrome.runtime.sendMessage({ action: "deleteNote", noteId: memo.id });
+      state.selectedNoteIds.delete(memo.id);
       loadNotes();
     },
   });
@@ -2090,6 +2190,7 @@ async function playNote(note, notice) {
 
 function setNotesScope(scope) {
   state.notesScope = scope;
+  state.selectedNoteIds.clear();
   el("notesScopeVideo").classList.toggle("active", scope === "video");
   el("notesScopeAll").classList.toggle("active", scope === "all");
   el("notesScopeMemo").classList.toggle("active", scope === "memo");
@@ -2343,6 +2444,13 @@ function setupEventListeners() {
   el("notesScopeAll").addEventListener("click", () => setNotesScope("all"));
   el("notesScopeMemo").addEventListener("click", () => setNotesScope("memo"));
   el("notesScopeAi").addEventListener("click", () => setNotesScope("ai"));
+  el("toggleNotesDeleteModeBtn").addEventListener("click", () =>
+    setNotesDeleteMode(!state.notesDeleteMode),
+  );
+  el("cancelNotesDeleteModeBtn").addEventListener("click", () => setNotesDeleteMode(false));
+  el("selectVisibleNotesBtn").addEventListener("click", selectVisibleNotes);
+  el("deleteSelectedNotesBtn").addEventListener("click", deleteSelectedNotes);
+  el("clearCurrentNotesBtn").addEventListener("click", clearCurrentNotes);
   el("loadMoreNotesBtn").addEventListener("click", loadMoreNotes);
   el("exportNotesJsonBtn").addEventListener("click", () => exportNotes("json"));
   el("exportNotesMarkdownBtn").addEventListener("click", () =>

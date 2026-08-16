@@ -351,6 +351,23 @@ test("笔记上限可配置，写入守住 7 MB 安全线，并在超过 100 条
   assert.match(html, /id="loadMoreNotesBtn"/);
 });
 
+test("笔记页支持多选删除与按当前范围一键清空", () => {
+  const html = readText("sidepanel.html");
+  const sidepanel = readText("sidepanel.js");
+  const background = readText("background.js");
+  for (const id of [
+    "toggleNotesDeleteModeBtn",
+    "selectVisibleNotesBtn",
+    "deleteSelectedNotesBtn",
+    "clearCurrentNotesBtn",
+  ]) assert.match(html, new RegExp(`id="${id}"`));
+  assert.match(sidepanel, /function deleteSelectedNotes\(/);
+  assert.match(sidepanel, /function clearCurrentNotes\(/);
+  assert.match(background, /message\?\.action === "deleteNotes"/);
+  assert.match(background, /message\?\.action === "clearNotes"/);
+  assert.match(background, /function noteMatchesScope\(/);
+});
+
 test("侧栏脚本引用的固定节点全部存在，聊天空态不会被消息重绘删除", () => {
   const html = readText("sidepanel.html");
   const sidepanel = readText("sidepanel.js");
