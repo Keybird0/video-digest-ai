@@ -240,6 +240,22 @@ test("问 AI 不以字幕成功为前置条件", () => {
   assert.match(prompt, /没有视频上下文时也要正常回答/);
 });
 
+test("问 AI 可按需关联字幕、概览和笔记，所有笔记都支持再次编辑", () => {
+  const html = readText("sidepanel.html");
+  const sidepanel = readText("sidepanel.js");
+  const background = readText("background.js");
+  assert.match(html, /id="chatContextTranscript"[^>]*checked/);
+  assert.match(html, /id="chatContextOverview"[^>]*checked/);
+  assert.match(html, /id="chatContextNotes"[^>]*checked/);
+  assert.match(sidepanel, /function chatContextSelection\(/);
+  assert.match(sidepanel, /contextSelection:\s*chatContextSelection\(\)/);
+  assert.match(background, /function normalizeChatContextSelection\(/);
+  assert.match(background, /function notesAsChatContext\(/);
+  assert.match(background, /function handleUpdateNote\(/);
+  assert.match(sidepanel, /function beginNoteEdit\(/);
+  assert.match(sidepanel, /action:\s*"updateNote"/);
+});
+
 test("字幕和概览章节均提供一键存为笔记，提示词恢复按钮等宽", () => {
   const script = readText("sidepanel.js");
   const css = readText("sidepanel.css");

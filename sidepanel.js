@@ -73,6 +73,10 @@ const SIDE_PANEL_EN = Object.freeze({
     "Save any answer from Ask AI here.",
   "有视频上下文时优先结合，也支持普通问答":
     "Uses video context when available and also supports general questions",
+  "关联上下文": "Use context",
+  "关联字幕": "Use transcript",
+  "关联概述": "Use overview",
+  "关联 Note": "Use notes",
   "清空对话": "Clear chat",
   "Enter 发送 · Shift+Enter 换行": "Enter to send · Shift+Enter for a new line",
   "发送": "Send",
@@ -114,6 +118,11 @@ const SIDE_PANEL_EN = Object.freeze({
   "复制带时间戳的视频链接": "Copy timestamped video link",
   "打开视频并跳到记录位置": "Open the video at the saved timestamp",
   "复制手记正文": "Copy memo text",
+  "编辑": "Edit",
+  "编辑这条笔记": "Edit this note",
+  "保存修改": "Save changes",
+  "取消": "Cancel",
+  "笔记内容不能为空。": "Note content cannot be empty.",
   "保存失败，请重试。": "Save failed. Please try again.",
   "回答中…": "Answering…",
   "概览生成失败": "Overview generation failed",
@@ -1072,6 +1081,14 @@ function resetChat() {
   if (el("chatMessages")) renderChat();
 }
 
+function chatContextSelection() {
+  return {
+    transcript: Boolean(el("chatContextTranscript").checked),
+    overview: Boolean(el("chatContextOverview").checked),
+    notes: Boolean(el("chatContextNotes").checked),
+  };
+}
+
 function renderChat() {
   const list = el("chatMessages");
   const empty = el("chatEmpty");
@@ -1150,6 +1167,7 @@ async function submitChatQuestion(questionInput) {
       videoInfo: state.data?.videoInfo || state.errorResult?.videoInfo || null,
       question,
       history,
+      contextSelection: chatContextSelection(),
     });
   } catch (error) {
     result = { success: false, message: error.message };
@@ -1682,6 +1700,59 @@ function renderAnyNote(note) {
   return renderNoteCard(note);
 }
 
+function beginNoteEdit(note, textElement, actions) {
+  const editor = document.createElement("textarea");
+  editor.className = "note-editor";
+  editor.rows = 4;
+  editor.maxLength = 12_000;
+  editor.value = note.text || "";
+
+  const editActions = document.createElement("div");
+  editActions.className = "entry-actions note-edit-actions";
+  const cancel = actionButton({
+    iconName: "copy",
+    label: "取消",
+    title: "取消",
+    onClick: () => {
+      editor.replaceWith(textElement);
+      editActions.replaceWith(actions);
+    },
+  });
+  const save = actionButton({
+    iconName: "edit",
+    label: "保存修改",
+    title: "保存修改",
+    onClick: async (button) => {
+      const text = String(editor.value || "").trim();
+      if (!text) {
+        editor.focus();
+        return;
+      }
+      button.disabled = true;
+      let result;
+      try {
+        result = await chrome.runtime.sendMessage({
+          action: "updateNote",
+          noteId: note.id,
+          text,
+        });
+      } catch (error) {
+        result = { success: false, message: error.message };
+      }
+      if (result?.success) {
+        await loadNotes();
+        return;
+      }
+      button.disabled = false;
+      button.title = uiText(result?.message || "保存失败，请重试。");
+    },
+  });
+  editActions.append(cancel, save);
+  textElement.replaceWith(editor);
+  actions.replaceWith(editActions);
+  editor.focus();
+}
+
 function renderNoteCard(note) {
   const card = document.createElement("div");
   card.className = `note${note.kind === "ai_chat" ? " note-ai-chat" : ""}`;
@@ -1746,6 +1817,12 @@ function renderNoteCard(note) {
   actions.className = "entry-actions";
   // 别的视频的笔记要开新标签页，图标换成「外链」，免得点下去才发现跳走了。
   actions.append(
+    actionButton({
+      iconName: "edit",
+      label: "编辑",
+      title: "编辑这条笔记",
+      onClick: () => beginNoteEdit(note, text, actions),
+    }),
     actionButton({
       iconName: away ? "external" : "play",
       label: away ? "打开" : "播放",
@@ -1828,6 +1905,14 @@ function renderMemoCard(memo, { ai = false } = {}) {
       }),
     );
   }
+  actions.appendChild(
+    actionButton({
+      iconName: "edit",
+      label: "编辑",
+      title: "编辑这条笔记",
+      onClick: () => beginNoteEdit(memo, text, actions),
+    }),
+  );
   actions.appendChild(
     actionButton({
       iconName: "copy",

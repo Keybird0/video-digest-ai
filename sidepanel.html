@@ -36,6 +36,9 @@
       <path d="M8.6 2.4H4.1c-.6 0-1.1.5-1.1 1.1v8.9c0 .6.5 1.1 1.1 1.1h6.2c.6 0 1.1-.5 1.1-1.1V7.9"/>
       <path d="M11.2 2.2a1.4 1.4 0 0 1 2 2L9.1 8.3l-2.5.5.5-2.5Z"/>
     </symbol>
+    <symbol id="i-edit" viewBox="0 0 16 16">
+      <path d="m3 11.75-.5 2.75 2.75-.5L13 6.25a1.75 1.75 0 0 0-2.5-2.5zM9.5 3.25 12 5.75"/>
+    </symbol>
   </svg>
 
   <header class="app-header">
@@ -280,6 +283,14 @@
     <section id="chatPanel" hidden>
       <div class="panel-toolbar chat-toolbar">
         <span class="muted">有视频上下文时优先结合，也支持普通问答</span>
+        <details class="chat-context-menu">
+          <summary id="chatContextSummary">关联上下文</summary>
+          <div class="chat-context-options">
+            <label><input id="chatContextTranscript" type="checkbox" checked />关联字幕</label>
+            <label><input id="chatContextOverview" type="checkbox" checked />关联概述</label>
+            <label><input id="chatContextNotes" type="checkbox" checked />关联 Note</label>
+          </div>
+        </details>
         <button id="clearChatBtn" class="ghost-btn" type="button">清空对话</button>
       </div>
       <div id="chatEmpty" class="chat-empty">

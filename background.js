@@ -284,6 +284,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message?.action === "updateNote") {
+    handleUpdateNote(message.noteId, message.text)
+      .then(sendResponse)
+      .catch((error) => sendResponse({ success: false, error: error.message }));
+    return true;
+  }
+
   if (message?.action === "checkVideoAvailable") {
     handleCheckVideoAvailable(message.bvid, message.site)
       .then(sendResponse)
@@ -1144,6 +1151,38 @@ function analysisAsChatContext(analysis) {
   return [...chapters, ...quotes].join("\n").slice(0, 8_000) || "（概览为空）";
 }
 
+function normalizeChatContextSelection(selection) {
+  // 兼容已有侧边栏：它们尚未发送该字段时，沿用原来的「全关联」行为。
+  if (!selection || typeof selection !== "object") {
+    return { transcript: true, overview: true, notes: true };
+  }
+  return {
+    transcript: selection.transcript === true,
+    overview: selection.overview === true,
+    notes: selection.notes === true,
+  };
+}
+
+function notesAsChatContext(notes, resource) {
+  if (!resource) return "（当前没有关联视频，未附加笔记）";
+  const matching = notes.filter(
+    (note) =>
+      (note.site || "bilibili") === resource.site &&
+      note.bvid === resource.videoId &&
+      typeof note.text === "string" &&
+      note.text.trim(),
+  );
+  const content = matching
+    .slice(0, 20)
+    .map((note) => {
+      const timestamp = note.timestamp ? `[${note.timestamp}] ` : "";
+      return `${timestamp}${note.text.trim().slice(0, 1_500)}`;
+    })
+    .join("\n\n")
+    .slice(0, 8_000);
+  return content || "（当前视频没有已保存笔记）";
+}
+
 async function handleAskVideo({
   bvid: videoIdInput,
   site,
@@ -1152,8 +1191,11 @@ async function handleAskVideo({
   videoInfo: providedVideoInfo,
   question,
   history = [],
+  contextSelection,
 }) {
   const resource = resolveVideo(site, videoIdInput, page);
+  const selectedContext = normalizeChatContextSelection(contextSelection);
+  const useVideoContext = Object.values(selectedContext).some(Boolean);
   const userQuestion = String(question || "").trim().slice(0, 2_000);
   if (!userQuestion) {
     return { success: false, error: "EMPTY_QUESTION", message: "请先输入问题。" };
@@ -1166,7 +1208,7 @@ async function handleAskVideo({
     providedVideoInfo && typeof providedVideoInfo === "object"
       ? providedVideoInfo
       : {};
-  if (resource) {
+  if (resource && (selectedContext.transcript || selectedContext.overview)) {
     try {
       // 只读已经取得的缓存，不为一次聊天重新阻塞式拉字幕。
       const cached = await BILI_CACHE.load(resource.cacheId, { page: resource.page });
@@ -1179,7 +1221,7 @@ async function handleAskVideo({
     }
 
     // YouTube 的标题等信息可直接向当前页面读取；失败也不阻断问答。
-    if (!videoInfo.title && resource.site === "youtube") {
+    if (!videoInfo.title && resource.site === "youtube" && useVideoContext) {
       try {
         videoInfo = await readYouTubePageInfo(tabId);
       } catch (error) {
@@ -1188,18 +1230,39 @@ async function handleAskVideo({
     }
   }
 
+  let notesContext = "（用户未选择关联笔记）";
+  if (selectedContext.notes) {
+    try {
+      notesContext = notesAsChatContext(await readNotes(), resource);
+    } catch (error) {
+      debugLog("[Video Digest AI] 问答未读到笔记，将跳过笔记上下文：", error);
+      notesContext = "（没有可用的已保存笔记）";
+    }
+  }
+
   try {
     const variables = {
-      videoTitle: videoInfo.title || (resource ? resource.videoId : "（未关联视频）"),
-      ownerName: videoInfo.owner || videoInfo.channelName || "未知",
+      videoTitle: useVideoContext
+        ? videoInfo.title || (resource ? resource.videoId : "（未关联视频）")
+        : "（未关联视频）",
+      ownerName: useVideoContext
+        ? videoInfo.owner || videoInfo.channelName || "未知"
+        : "（无）",
       videoDescription:
-        String(videoInfo.description || "（无简介）").slice(0, 4_000),
-      overviewText: transcript
+        useVideoContext
+          ? String(videoInfo.description || "（无简介）").slice(0, 4_000)
+          : "（未关联视频资料）",
+      overviewText: selectedContext.overview && transcript
         ? analysisAsChatContext(transcript.analysis)
-        : "（当前没有可用的视频概览）",
-      transcriptContext: transcript?.segments?.length
+        : selectedContext.overview
+          ? "（当前没有可用的视频概览）"
+          : "（用户未选择关联概览）",
+      transcriptContext: selectedContext.transcript && transcript?.segments?.length
         ? BILI_AI.buildChatTranscriptContext(transcript.segments, userQuestion)
-        : "（当前没有可用的视频字幕；可以正常回答一般问题，但不要假装了解未提供的视频内容。）",
+        : selectedContext.transcript
+          ? "（当前没有可用的视频字幕；可以正常回答一般问题，但不要假装了解未提供的视频内容。）"
+          : "（用户未选择关联字幕）",
+      notesContext,
       question: userQuestion,
     };
     const [systemPrompt, userPrompt] = await Promise.all([
@@ -1326,7 +1389,7 @@ async function polishNoteWhenReady(noteId, context, videoTitle) {
   const polished = await polishNoteText(context, videoTitle);
   await mutateNotes((notes) =>
     notes.map((note) =>
-      note.id === noteId
+      note.id === noteId && note.pending
         ? { ...note, text: polished || note.text, pending: false }
         : note,
     ),
@@ -1489,6 +1552,25 @@ async function handleGetMemos(kind) {
 
 async function handleDeleteNote(noteId) {
   await mutateNotes((notes) => notes.filter((note) => note.id !== noteId));
+  return { success: true };
+}
+
+async function handleUpdateNote(noteId, text) {
+  const nextText = String(text || "").trim().slice(0, 12_000);
+  if (!nextText) {
+    return { success: false, error: "EMPTY_NOTE", message: "笔记内容不能为空。" };
+  }
+  let found = false;
+  await mutateNotes((notes) =>
+    notes.map((note) => {
+      if (note.id !== noteId) return note;
+      found = true;
+      // 手动修改应胜过尚未完成的 AI 润色，避免后台结果把用户编辑覆盖掉。
+      return { ...note, text: nextText, pending: false, updatedAt: Date.now() };
+    }),
+  );
+  if (!found) return { success: false, error: "NOTE_NOT_FOUND", message: "笔记不存在。" };
+  chrome.runtime.sendMessage({ action: "noteUpdated", noteId }).catch(() => {});
   return { success: true };
 }
 

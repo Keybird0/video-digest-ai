@@ -668,6 +668,29 @@ code {
   border-top: 1px solid var(--border);
 }
 
+.notes-guide-card .hint {
+  margin-bottom: 10px;
+}
+
+.notes-guide-list {
+  display: grid;
+  gap: 7px;
+  padding-left: 20px;
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.notes-guide-list kbd {
+  padding: 1px 5px;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
 .actions {
   display: flex;
   align-items: center;

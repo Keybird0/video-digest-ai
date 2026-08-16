@@ -25,6 +25,10 @@
 <video_transcript>
 {transcriptContext}
 </video_transcript>
+
+<video_notes>
+{notesContext}
+</video_notes>
 ```
 
 ## 用户提示词

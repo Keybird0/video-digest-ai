@@ -84,6 +84,14 @@ function createContext({
   };
 
   const sent = [];
+  // 真实页面中的三个复选框在 HTML 里默认全选；桩没有解析 HTML，显式补上。
+  for (const id of [
+    "chatContextTranscript",
+    "chatContextOverview",
+    "chatContextNotes",
+  ]) {
+    byId(id).checked = true;
+  }
   const openedTabs = [];
   const seeks = [];
   const context = {
@@ -156,7 +164,7 @@ function createContext({
   // 所以在末尾追加一行，从同一个词法作用域里把要测的绑定递出来。
   const source = fs.readFileSync(path.join(ROOT, "sidepanel.js"), "utf8");
   vm.runInContext(
-    `${source}\n;globalThis.__api = { state, uiText, parseVideoRef, activeTab, syncWithActiveTab, loadTranscript, analyze, renderSegments, renderAnalysis, segmentDisplayText, noteTextForSegment, saveTextAsVideoNote, paintSegmentText, setTranscriptMode, selectionContext, applySearchFilter, updateFollowPill, jumpToActive, closeSearch, renderNoteCard, renderMemoCard, playNote, saveMemo, currentMemoVideoContext, submitChatQuestion, saveChatAsNote, renderChat, switchTab, renderOverviewPrompt, resetOverviewPrompt };`,
+    `${source}\n;globalThis.__api = { state, uiText, parseVideoRef, activeTab, syncWithActiveTab, loadTranscript, analyze, renderSegments, renderAnalysis, segmentDisplayText, noteTextForSegment, saveTextAsVideoNote, paintSegmentText, setTranscriptMode, selectionContext, applySearchFilter, updateFollowPill, jumpToActive, closeSearch, renderNoteCard, renderMemoCard, playNote, saveMemo, currentMemoVideoContext, submitChatQuestion, saveChatAsNote, renderChat, switchTab, renderOverviewPrompt, resetOverviewPrompt, chatContextSelection };`,
     context,
   );
 
@@ -920,6 +928,28 @@ test("问 AI 支持连续追问并把历史发送给后台", async () => {
       ["assistant", "回答：第一问是什么？"],
     ],
   );
+});
+
+test("问 AI 默认关联三类上下文，全部关闭时明确发送纯问答选择", async () => {
+  const ctx = createContext({ transcript: transcriptResult() });
+  await ctx.submitChatQuestion("默认上下文");
+  const [defaultAsk] = ctx.sent.filter((message) => message.action === "askVideo");
+  assert.deepEqual(JSON.parse(JSON.stringify(defaultAsk.contextSelection)), {
+    transcript: true,
+    overview: true,
+    notes: true,
+  });
+
+  ctx.el("chatContextTranscript").checked = false;
+  ctx.el("chatContextOverview").checked = false;
+  ctx.el("chatContextNotes").checked = false;
+  await ctx.submitChatQuestion("纯问答");
+  const asks = ctx.sent.filter((message) => message.action === "askVideo");
+  assert.deepEqual(JSON.parse(JSON.stringify(asks.at(-1).contextSelection)), {
+    transcript: false,
+    overview: false,
+    notes: false,
+  });
 });
 
 test("没有字幕或视频上下文时问 AI 仍可自由对话", async () => {

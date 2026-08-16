@@ -715,6 +715,25 @@ body {
   white-space: pre-wrap;
 }
 
+.note-editor {
+  width: 100%;
+  min-height: 92px;
+  padding: 9px 10px;
+  resize: vertical;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: 7px;
+  outline: none;
+}
+
+.note-edit-actions {
+  margin-top: 8px;
+}
+
 /* ---------- 问 AI ---------- */
 
 #chatPanel {
@@ -917,6 +936,69 @@ body {
 .chat-composer {
   padding: 10px 14px 12px;
   background: var(--bg);
+}
+
+.chat-toolbar {
+  flex-wrap: wrap;
+}
+
+.chat-context-menu {
+  position: relative;
+  margin-left: auto;
+}
+
+.chat-context-menu summary {
+  list-style: none;
+  padding: 4px 9px;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.chat-context-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.chat-context-menu summary::after {
+  margin-left: 5px;
+  content: "▾";
+}
+
+.chat-context-menu[open] summary {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.chat-context-options {
+  position: absolute;
+  top: calc(100% + 5px);
+  right: 0;
+  z-index: 12;
+  display: grid;
+  gap: 7px;
+  min-width: 138px;
+  padding: 9px 10px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px color-mix(in srgb, #000 16%, transparent);
+}
+
+.chat-context-options label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.chat-context-options input {
+  accent-color: var(--accent);
 }
 
 .chat-composer textarea {

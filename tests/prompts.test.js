@@ -58,6 +58,7 @@ const PROMPTS = {
     videoDescription: "测试简介",
     overviewText: "[0:00] 测试概览",
     transcriptContext: "[0:00] 测试字幕",
+    notesContext: "[0:00] 测试笔记",
     question: "视频讲了什么？",
   },
 };
