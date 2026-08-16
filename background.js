@@ -28,7 +28,6 @@ const AI_MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 // 加码重试的天花板。再往上多数模型会因超过自身输出上限直接拒绝请求。
 const MAX_OUTPUT_TOKENS = 32_768;
 const NOTES_STORAGE_KEY = "video_digest_notes";
-const LEGACY_NOTES_STORAGE_KEY = "bili_digest_notes";
 const MAX_NOTES = 100;
 const PRIMARY_FAILOVER_COOLDOWN_MS = 60_000;
 const providerHealth = { primaryUnavailableUntil: 0 };
@@ -1285,19 +1284,10 @@ async function handleExplainSelection(selectedText, transcriptContext, videoTitl
 const notesWriteQueue = BILI_CONCURRENCY.createSerialQueue();
 
 async function readNotes() {
-  const stored = await chrome.storage.local.get([
-    NOTES_STORAGE_KEY,
-    LEGACY_NOTES_STORAGE_KEY,
-  ]);
-  const notes = Array.isArray(stored[NOTES_STORAGE_KEY])
+  const stored = await chrome.storage.local.get(NOTES_STORAGE_KEY);
+  return Array.isArray(stored[NOTES_STORAGE_KEY])
     ? stored[NOTES_STORAGE_KEY]
-    : Array.isArray(stored[LEGACY_NOTES_STORAGE_KEY])
-      ? stored[LEGACY_NOTES_STORAGE_KEY]
-      : [];
-  if (!stored[NOTES_STORAGE_KEY] && notes.length) {
-    await chrome.storage.local.set({ [NOTES_STORAGE_KEY]: notes });
-  }
-  return notes;
+    : [];
 }
 
 function mutateNotes(mutate) {

@@ -243,6 +243,12 @@ test("笔记页提供 JSON、Markdown 和 CSV 本地导出", () => {
   assert.match(sidepanel, /function notesAsCsv\(notes\)/);
 });
 
+test("笔记只使用 video_digest_notes 存储键", () => {
+  const background = readText("background.js");
+  assert.match(background, /const NOTES_STORAGE_KEY = "video_digest_notes"/);
+  assert.doesNotMatch(background, /bili_digest_notes|LEGACY_NOTES_STORAGE_KEY/);
+});
+
 test("笔记范围按本视频、手记、AI 记、全部排列，全部视图汇总所有笔记类型", () => {
   const html = readText("sidepanel.html");
   const sidepanel = readText("sidepanel.js");
