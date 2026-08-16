@@ -1353,7 +1353,7 @@ async function handleSaveNote({
   if (!transcript.success) return transcript;
 
   const videoTitle = transcript.videoInfo?.title || "";
-  // 概览里的「存为笔记」已经有整理好的文字，不必再过一次模型。
+  // 字幕或概览里的「存为笔记」已经有整理好的文字，不必再过一次模型。
   let noteText = String(manualText || "").trim();
   let rawText = noteText;
   let polishContext = null;

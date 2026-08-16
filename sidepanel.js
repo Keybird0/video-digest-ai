@@ -529,7 +529,19 @@ function renderSegments(segments = []) {
     text.className = "segment-text";
     paintSegmentText(text, segment);
 
-    row.append(time, text);
+    const saveBtn = document.createElement("button");
+    saveBtn.type = "button";
+    saveBtn.className = "ghost-btn segment-save-btn";
+    saveBtn.textContent = uiText("存为笔记");
+    saveBtn.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      await saveTextAsVideoNote(saveBtn, {
+        timestamp: segment.start,
+        text: noteTextForSegment(segment),
+      });
+    });
+
+    row.append(time, text, saveBtn);
     row.addEventListener("click", (event) => onEntryClick(event, segment.start));
     fragment.appendChild(row);
     segmentView.rows.push(row);
@@ -553,6 +565,38 @@ function segmentDisplayText(segment) {
     return state.translated[segment.id] || sourceText(segment);
   }
   return sourceText(segment);
+}
+
+// 笔记跟随当前阅读视图：双语时同时保存原文和已取得的译文，单语时保存当前显示内容。
+function noteTextForSegment(segment) {
+  if (state.transcriptMode === "bilingual") {
+    return [sourceText(segment), state.translated[segment.id]].filter(Boolean).join("\n");
+  }
+  return segmentDisplayText(segment);
+}
+
+async function saveTextAsVideoNote(button, { timestamp, text }) {
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = uiText("保存中…");
+  let result;
+  try {
+    result = await chrome.runtime.sendMessage({
+      action: "saveNote",
+      site: state.site,
+      bvid: state.bvid,
+      page: state.page,
+      timestamp,
+      text,
+    });
+  } catch (error) {
+    result = { success: false };
+  }
+  button.textContent = uiText(result?.success ? "已保存" : "保存失败");
+  setTimeout(() => {
+    button.disabled = false;
+    button.textContent = original;
+  }, 1_500);
 }
 
 // 把文字写进节点，命中搜索词的部分套上 <mark>。字幕是外部内容，
@@ -1305,7 +1349,23 @@ function renderAnalysis(analysis, fromCache, { failedChunks = 0 } = {}) {
     summary.className = "entry-text";
     summary.textContent = chapter.summary;
 
-    card.append(head, summary);
+    const actions = document.createElement("div");
+    actions.className = "entry-actions";
+    const saveBtn = document.createElement("button");
+    saveBtn.type = "button";
+    saveBtn.className = "ghost-btn";
+    saveBtn.textContent = uiText("存为笔记");
+    saveBtn.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      // 章节标题与摘要是同一条概览信息，合并保存才能离线阅读时保留语义。
+      await saveTextAsVideoNote(saveBtn, {
+        timestamp: chapter.timestampSeconds,
+        text: [chapter.title, chapter.summary].filter(Boolean).join("\n"),
+      });
+    });
+    actions.appendChild(saveBtn);
+
+    card.append(head, summary, actions);
     card.addEventListener("click", (event) =>
       onEntryClick(event, chapter.timestampSeconds),
     );
@@ -1339,22 +1399,11 @@ function renderAnalysis(analysis, fromCache, { failedChunks = 0 } = {}) {
     saveBtn.textContent = uiText("存为笔记");
     saveBtn.addEventListener("click", async (event) => {
       event.stopPropagation();
-      saveBtn.disabled = true;
-      saveBtn.textContent = uiText("保存中…");
       // 金句已经是模型整理过的文本，直接落库，不必再润色一遍。
-      const result = await chrome.runtime.sendMessage({
-        action: "saveNote",
-        site: state.site,
-        bvid: state.bvid,
-        page: state.page,
+      await saveTextAsVideoNote(saveBtn, {
         timestamp: quote.timestampSeconds,
         text: quote.quote,
       });
-      saveBtn.textContent = uiText(result?.success ? "已保存" : "保存失败");
-      setTimeout(() => {
-        saveBtn.disabled = false;
-        saveBtn.textContent = uiText("存为笔记");
-      }, 1500);
     });
     actions.appendChild(saveBtn);
 

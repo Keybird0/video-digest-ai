@@ -393,9 +393,18 @@ body {
 
 .segment-text {
   flex: 1 1 auto;
+  min-width: 0;
   line-height: 1.7;
   /* 字幕里可能出现长串英文/URL，别把面板撑出横向滚动条 */
   overflow-wrap: anywhere;
+}
+
+.segment-save-btn {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  margin-top: 1px;
+  padding: 3px 7px;
+  font-size: 11px;
 }
 
 .segment.active {
@@ -863,6 +872,11 @@ body {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 6px;
+}
+
+.overview-prompt-reset-actions .ghost-btn {
+  box-sizing: border-box;
+  min-width: 140px;
 }
 
 .overview-prompt-editor textarea {

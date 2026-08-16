@@ -230,6 +230,16 @@ test("问 AI 不以字幕成功为前置条件", () => {
   assert.match(prompt, /没有视频上下文时也要正常回答/);
 });
 
+test("字幕和概览章节均提供一键存为笔记，提示词恢复按钮等宽", () => {
+  const script = readText("sidepanel.js");
+  const css = readText("sidepanel.css");
+  assert.match(script, /function saveTextAsVideoNote/);
+  assert.match(script, /className = "ghost-btn segment-save-btn"/);
+  assert.match(script, /noteTextForSegment/);
+  assert.match(script, /章节标题与摘要是同一条概览信息/);
+  assert.match(css, /\.overview-prompt-reset-actions \.ghost-btn[\s\S]*min-width: 140px/);
+});
+
 test("问 AI 安全渲染 Markdown，概览页提供可编辑提示词", () => {
   const html = readText("sidepanel.html");
   const sidepanel = readText("sidepanel.js");

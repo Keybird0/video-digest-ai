@@ -54,7 +54,10 @@ function createElement(tag = "div") {
       this.scrolled = true;
     },
     focus() {},
-    addEventListener() {},
+    listeners: new Map(),
+    addEventListener(type, listener) {
+      this.listeners.set(type, listener);
+    },
     removeEventListener() {},
     // 同一个选择器要返回同一个对象，否则写进去的值下次就读不到了。
     querySelector(selector) {
@@ -153,7 +156,7 @@ function createContext({
   // 所以在末尾追加一行，从同一个词法作用域里把要测的绑定递出来。
   const source = fs.readFileSync(path.join(ROOT, "sidepanel.js"), "utf8");
   vm.runInContext(
-    `${source}\n;globalThis.__api = { state, uiText, parseVideoRef, activeTab, syncWithActiveTab, loadTranscript, analyze, segmentDisplayText, paintSegmentText, setTranscriptMode, selectionContext, applySearchFilter, updateFollowPill, jumpToActive, closeSearch, renderNoteCard, renderMemoCard, playNote, saveMemo, currentMemoVideoContext, submitChatQuestion, saveChatAsNote, renderChat, switchTab, renderOverviewPrompt, resetOverviewPrompt };`,
+    `${source}\n;globalThis.__api = { state, uiText, parseVideoRef, activeTab, syncWithActiveTab, loadTranscript, analyze, renderSegments, renderAnalysis, segmentDisplayText, noteTextForSegment, saveTextAsVideoNote, paintSegmentText, setTranscriptMode, selectionContext, applySearchFilter, updateFollowPill, jumpToActive, closeSearch, renderNoteCard, renderMemoCard, playNote, saveMemo, currentMemoVideoContext, submitChatQuestion, saveChatAsNote, renderChat, switchTab, renderOverviewPrompt, resetOverviewPrompt };`,
     context,
   );
 
@@ -178,6 +181,45 @@ const ANALYSIS = {
   ],
   keyQuotes: [{ timestamp: "0:05", timestampSeconds: 5, quote: "一句金句" }],
 };
+
+test("字幕片段可一键存为带时间锚点的视频笔记", async () => {
+  const ctx = createContext({ transcript: transcriptResult() });
+  ctx.state.site = "bilibili";
+  ctx.state.bvid = "BV1xx411c7mD";
+  ctx.state.page = 1;
+  ctx.renderSegments(SEGMENTS);
+
+  const row = ctx.el("transcriptList").children[0].children[0];
+  const save = row.children[2];
+  await save.listeners.get("click")({ stopPropagation() {} });
+
+  const message = ctx.sent.find((item) => item.action === "saveNote");
+  assert.equal(message.timestamp, 0);
+  assert.equal(message.text, "第一段原文");
+  assert.equal(message.bvid, "BV1xx411c7mD");
+});
+
+test("概览章节与金句都可一键存为视频笔记", async () => {
+  const ctx = createContext({ transcript: transcriptResult() });
+  ctx.state.site = "bilibili";
+  ctx.state.bvid = "BV1xx411c7mD";
+  ctx.state.page = 1;
+  ctx.renderAnalysis(ANALYSIS, false);
+
+  const chapterSave = ctx.el("chapterList").children[0].children[2].children[0];
+  await chapterSave.listeners.get("click")({ stopPropagation() {} });
+  const quoteSave = ctx.el("quoteList").children[0].children[2].children[0];
+  await quoteSave.listeners.get("click")({ stopPropagation() {} });
+
+  const saved = ctx.sent.filter((item) => item.action === "saveNote");
+  assert.deepEqual(
+    saved.map(({ timestamp, text }) => ({ timestamp, text })),
+    [
+      { timestamp: 0, text: "开场\n讲了开场" },
+      { timestamp: 5, text: "一句金句" },
+    ],
+  );
+});
 
 test("英文界面会翻译侧边栏菜单和动态计数", () => {
   const ctx = createContext({ transcript: transcriptResult() });
