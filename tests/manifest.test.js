@@ -190,6 +190,16 @@ test("两站页面按钮使用同一蓝色，Note 明确使用白色文字", () 
   assert.match(youtube, /color:\s*#fff/i);
 });
 
+test("YouTube 操作栏延迟或缺失时，Digest 会退到播放器并持续自检", () => {
+  const youtube = readText("content-youtube.js");
+  assert.match(youtube, /function findPlayerContainer\(/);
+  assert.match(youtube, /function setDigestButtonPlacement\(/);
+  assert.match(youtube, /Digest button using player fallback/);
+  assert.match(youtube, /function setupControlsHealthCheck\(/);
+  assert.match(youtube, /CONTROLS_HEALTH_CHECK_MS\s*=\s*1500/);
+  assert.match(youtube, /setupControlsHealthCheck\(\);/);
+});
+
 test("模型选择使用独立 select，不再受 datalist 当前值过滤", () => {
   const html = readText("options.html");
   const script = readText("options.js");

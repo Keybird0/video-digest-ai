@@ -30,12 +30,14 @@ let ytdDigestButton = null;
 let digestButtonObserver = null;
 let digestButtonReconcileTimer = null;
 let digestButtonResizeListenerAdded = false;
+let controlsHealthTimer = null;
 let siteEnabled = true;
 
 const DIGEST_BLUE = "#168cff";
 const DIGEST_BLUE_HOVER = "#0879e8";
 const NOTE_BACKGROUND = "rgba(0, 0, 0, 0.56)";
 const NOTE_BACKGROUND_HOVER = "rgba(0, 0, 0, 0.72)";
+const CONTROLS_HEALTH_CHECK_MS = 1500;
 
 // ============================================================
 // INITIALIZATION
@@ -75,6 +77,19 @@ async function init() {
   // (YouTube is an SPA, so elements appear/disappear as you navigate)
   setupButtonObserver();
   setupDigestButtonResizeListener();
+  setupControlsHealthCheck();
+}
+
+// YouTube can finish a watch-page render without another mutation we can
+// observe. Keep a small safety net so an enabled video page never stays
+// without controls just because an action row or player arrived late.
+function setupControlsHealthCheck() {
+  if (controlsHealthTimer) return;
+  controlsHealthTimer = setInterval(() => {
+    if (!siteEnabled || !window.location.pathname.includes("/watch")) return;
+    injectDigestButton();
+    if (!ytdNoteButton || !ytdNoteButton.isConnected) tryInjectNoteButton();
+  }, CONTROLS_HEALTH_CHECK_MS);
 }
 
 /**
@@ -261,6 +276,30 @@ function findDigestButtonHost() {
   );
 }
 
+function findPlayerContainer() {
+  return document.querySelector(
+    "#movie_player.html5-video-player, #movie_player, .html5-video-player",
+  );
+}
+
+function setDigestButtonPlacement(digestButton, { floating }) {
+  if (floating) {
+    // Use the same player host as Note while YouTube's native action row is
+    // unavailable. Reconciliation moves it back below the video once ready.
+    digestButton.style.position = "absolute";
+    digestButton.style.top = "16px";
+    digestButton.style.right = "126px";
+    digestButton.style.zIndex = "9999";
+    digestButton.style.marginRight = "0";
+    return;
+  }
+  digestButton.style.position = "";
+  digestButton.style.top = "";
+  digestButton.style.right = "";
+  digestButton.style.zIndex = "";
+  digestButton.style.marginRight = "8px";
+}
+
 function createDigestButton() {
   const digestButton = document.createElement("button");
   digestButton.id = "ytd-digest-button";
@@ -348,12 +387,6 @@ function injectDigestButton() {
     return false;
   }
 
-  const actionsContainer = findDigestButtonHost();
-  if (!actionsContainer) {
-    debugLog("[YouTube Digest Content] Visible actions container not found yet");
-    return false;
-  }
-
   let digestButton = existingButtons.find(
     (button) => button === ytdDigestButton,
   );
@@ -368,6 +401,29 @@ function injectDigestButton() {
     if (button !== digestButton) button.remove();
   });
 
+  const actionsContainer = findDigestButtonHost();
+  if (!actionsContainer) {
+    const playerContainer = findPlayerContainer();
+    if (!playerContainer) {
+      debugLog(
+        "[YouTube Digest Content] Neither action row nor player is ready yet",
+      );
+      return false;
+    }
+    if (
+      window.getComputedStyle(playerContainer).position === "static" ||
+      !playerContainer.style.position
+    ) {
+      playerContainer.style.position = "relative";
+    }
+    setDigestButtonPlacement(digestButton, { floating: true });
+    if (digestButton.parentElement !== playerContainer) {
+      playerContainer.appendChild(digestButton);
+    }
+    debugLog("[YouTube Digest Content] Digest button using player fallback");
+    return true;
+  }
+
   if (digestButton.parentElement !== actionsContainer) {
     // YouTube turns #actions-inner into a vertical flex column at narrow
     // breakpoints. A direct child there stretches into a full-width second
@@ -375,6 +431,7 @@ function injectDigestButton() {
     // prepend it to preserve visibility when space is limited.
     actionsContainer.insertBefore(digestButton, actionsContainer.firstChild);
   }
+  setDigestButtonPlacement(digestButton, { floating: false });
 
   debugLog("[YouTube Digest Content] Digest button reconciled");
   return true;
@@ -451,11 +508,7 @@ function injectNoteButton() {
 
   // Find the video player container. YouTube rebuilds this dynamically, so
   // we try the most common selectors.
-  const playerContainer = document.querySelector(
-    "#movie_player.html5-video-player, " +
-      "#movie_player, " +
-      ".html5-video-player",
-  );
+  const playerContainer = findPlayerContainer();
 
   if (!playerContainer) {
     debugLog(
@@ -844,6 +897,10 @@ function removeInjectedControls() {
   if (ytdNoteButtonRetryTimer) {
     clearInterval(ytdNoteButtonRetryTimer);
     ytdNoteButtonRetryTimer = null;
+  }
+  if (controlsHealthTimer) {
+    clearInterval(controlsHealthTimer);
+    controlsHealthTimer = null;
   }
 }
 
