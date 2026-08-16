@@ -118,7 +118,6 @@ const SIDE_PANEL_EN = Object.freeze({
   "回答中…": "Answering…",
   "概览生成失败": "Overview generation failed",
   "概览提示词（可调整）": "Overview prompt (editable)",
-  "恢复中文默认": "Restore Chinese default",
   "修改会自动保存在本机，并用于下一次生成。":
     "Changes are saved locally and used for the next generation.",
   "已自动保存": "Saved automatically",

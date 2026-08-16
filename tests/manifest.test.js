@@ -207,8 +207,8 @@ test("问 AI 安全渲染 Markdown，概览页提供可编辑提示词", () => {
   assert.match(html, /lib\/markdown\.js/);
   assert.match(sidepanel, /BILI_MARKDOWN\.render/);
   assert.match(html, /id="overviewPrompt"/);
-  assert.match(html, /id="resetOverviewPromptZhBtn"[^>]*>\s*恢复中文默认/);
-  assert.match(html, /id="resetOverviewPromptEnBtn"[^>]*>\s*Restore English default/);
+  assert.match(html, /id="resetOverviewPromptZhBtn"[^>]*>\s*恢复默认/);
+  assert.match(html, /id="resetOverviewPromptEnBtn"[^>]*>\s*Restore default/);
   assert.match(sidepanel, /customPrompt:\s*el\("overviewPrompt"\)/);
   assert.match(sidepanel, /resetOverviewPrompt\("zh-CN"\)/);
   assert.match(sidepanel, /resetOverviewPrompt\("en"\)/);
