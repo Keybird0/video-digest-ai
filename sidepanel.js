@@ -126,6 +126,10 @@ const SIDE_PANEL_EN = Object.freeze({
   "请稍后重试。": "Please try again later.",
   "这个视频还没有笔记": "No notes for this video",
   "还没有任何笔记": "No notes yet",
+  "导出当前范围": "Export current scope",
+  "导出为 JSON": "Export as JSON",
+  "导出为 Markdown": "Export as Markdown",
+  "导出为 CSV": "Export as CSV",
   "访问锚点": "Open timestamp",
   "已保存，并记录当前视频访问锚点。":
     "Saved with the current video timestamp.",
@@ -224,6 +228,7 @@ const state = {
   currentTime: 0,
   chatMessages: [], // 当前视频的多轮问答，仅在本次侧栏会话中保留
   chatSending: false,
+  notesForExport: [],
   overviewPrompts: { ...BILI_SETTINGS.DEFAULT_OVERVIEW_PROMPTS },
 };
 
@@ -1363,6 +1368,8 @@ function renderAnalysis(analysis, fromCache, { failedChunks = 0 } = {}) {
 // ============================================================
 
 async function loadNotes() {
+  state.notesForExport = [];
+  setNotesExportButtonsDisabled(true);
   if (state.notesScope === "ai") {
     el("notesEntries").hidden = true;
     el("memoPanel").hidden = true;
@@ -1371,7 +1378,8 @@ async function loadNotes() {
       action: "getMemos",
       kind: "ai_note",
     });
-    renderAiNotes(result?.notes || []);
+    state.notesForExport = result?.notes || [];
+    renderAiNotes(state.notesForExport);
     return;
   }
   if (state.notesScope === "memo") {
@@ -1382,7 +1390,8 @@ async function loadNotes() {
       action: "getMemos",
       kind: "memo",
     });
-    renderMemos(result?.notes || []);
+    state.notesForExport = result?.notes || [];
+    renderMemos(state.notesForExport);
     return;
   }
   el("notesEntries").hidden = false;
@@ -1394,11 +1403,13 @@ async function loadNotes() {
     bvid: state.notesScope === "video" ? state.bvid : null,
     scope: state.notesScope,
   });
-  renderNotes(result?.notes || []);
+  state.notesForExport = result?.notes || [];
+  renderNotes(state.notesForExport);
 }
 
 function renderMemos(memos) {
   el("notesCount").textContent = memos.length ? uiText(`${memos.length} 条`) : "";
+  setNotesExportButtonsDisabled(memos.length === 0);
   el("memoEmpty").hidden = memos.length > 0;
   const list = el("memoList");
   list.textContent = "";
@@ -1407,6 +1418,7 @@ function renderMemos(memos) {
 
 function renderAiNotes(notes) {
   el("notesCount").textContent = notes.length ? uiText(`${notes.length} 条`) : "";
+  setNotesExportButtonsDisabled(notes.length === 0);
   el("aiNotesEmpty").hidden = notes.length > 0;
   const list = el("aiNotesList");
   list.textContent = "";
@@ -1457,6 +1469,7 @@ function flashActionButton(button, message) {
 
 function renderNotes(notes) {
   el("notesCount").textContent = notes.length ? uiText(`${notes.length} 条`) : "";
+  setNotesExportButtonsDisabled(notes.length === 0);
   el("notesEmpty").hidden = notes.length > 0;
   // 「本视频」下空着，多半只是这个视频没记过，别让人以为笔记全丢了。
   el("notesEmptyTitle").textContent = uiText(
@@ -1466,6 +1479,148 @@ function renderNotes(notes) {
   const list = el("notesList");
   list.textContent = "";
   for (const note of notes) list.appendChild(renderAnyNote(note));
+}
+
+function setNotesExportButtonsDisabled(disabled) {
+  for (const id of [
+    "exportNotesJsonBtn",
+    "exportNotesMarkdownBtn",
+    "exportNotesCsvBtn",
+  ]) {
+    const button = el(id);
+    if (button) button.disabled = disabled;
+  }
+}
+
+function noteKindLabel(kind) {
+  if (state.uiLanguage === "en") {
+    if (kind === "memo") return "Memo";
+    if (kind === "ai_note" || kind === "ai_chat") return "AI Note";
+    return "Video Note";
+  }
+  if (kind === "memo") return "手记";
+  if (kind === "ai_note" || kind === "ai_chat") return "AI 记";
+  return "视频笔记";
+}
+
+function noteSourceLabel(note) {
+  return [note.videoTitle, note.timestamp].filter(Boolean).join(" · ");
+}
+
+function noteCreatedAt(note) {
+  if (!note.createdAt) return "";
+  const date = new Date(note.createdAt);
+  return Number.isNaN(date.getTime()) ? String(note.createdAt) : date.toISOString();
+}
+
+function csvCell(value) {
+  return `"${String(value ?? "").replace(/"/g, '""')}"`;
+}
+
+function notesAsCsv(notes) {
+  const fields = [
+    "id",
+    "kind",
+    "text",
+    "createdAt",
+    "createdAtISO",
+    "site",
+    "bvid",
+    "page",
+    "videoTitle",
+    "ownerName",
+    "timestamp",
+    "timestampSeconds",
+    "timestampedUrl",
+    "rawText",
+    "pending",
+  ];
+  return [
+    fields.map(csvCell).join(","),
+    ...notes.map((note) =>
+      fields
+        .map((field) =>
+          csvCell(field === "createdAtISO" ? noteCreatedAt(note) : note[field]),
+        )
+        .join(","),
+    ),
+  ].join("\r\n");
+}
+
+function notesAsMarkdown(notes) {
+  const english = state.uiLanguage === "en";
+  const exportedAt = new Date().toISOString();
+  const sections = notes.map((note) => {
+    const source = noteSourceLabel(note);
+    const lines = [
+      `## ${noteKindLabel(note.kind)}${source ? ` · ${source}` : ""}`,
+      `- ${english ? "Created" : "创建时间"}: ${noteCreatedAt(note) || (english ? "Unknown" : "未知")}`,
+    ];
+    if (note.site) lines.push(`- ${english ? "Platform" : "平台"}: ${note.site}`);
+    if (note.ownerName) lines.push(`- ${english ? "Author" : "作者"}: ${note.ownerName}`);
+    if (note.timestampedUrl) {
+      lines.push(`- ${english ? "Source" : "来源"}: ${note.timestampedUrl}`);
+    }
+    lines.push("", String(note.text || "").trim());
+    return lines.join("\n");
+  });
+  return [
+    english ? "# Video Digest AI Notes" : "# Video Digest AI 笔记",
+    `${english ? "Exported" : "导出时间"}: ${exportedAt}`,
+    "",
+    ...sections,
+  ].join("\n\n");
+}
+
+function notesExportFilename(extension) {
+  const scopeLabel =
+    state.notesScope === "video"
+      ? state.data?.videoInfo?.title || state.bvid || "当前视频"
+      : state.notesScope === "memo"
+        ? "手记"
+        : state.notesScope === "ai"
+          ? "AI记"
+          : "全部笔记";
+  return `${sanitizeFilename(`video-digest-${scopeLabel}`)}.${extension}`;
+}
+
+function downloadNotesFile(content, extension, mimeType) {
+  const blob = new Blob([content], { type: `${mimeType};charset=utf-8` });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = notesExportFilename(extension);
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportNotes(format) {
+  const notes = Array.isArray(state.notesForExport) ? state.notesForExport : [];
+  if (!notes.length) return;
+  if (format === "json") {
+    downloadNotesFile(
+      JSON.stringify(
+        {
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          scope: state.notesScope,
+          notes,
+        },
+        null,
+        2,
+      ),
+      "json",
+      "application/json",
+    );
+    return;
+  }
+  if (format === "markdown") {
+    downloadNotesFile(notesAsMarkdown(notes), "md", "text/markdown");
+    return;
+  }
+  if (format === "csv") {
+    downloadNotesFile(`\ufeff${notesAsCsv(notes)}`, "csv", "text/csv");
+  }
 }
 
 function renderAnyNote(note) {
@@ -1990,6 +2145,11 @@ function setupEventListeners() {
   el("notesScopeAll").addEventListener("click", () => setNotesScope("all"));
   el("notesScopeMemo").addEventListener("click", () => setNotesScope("memo"));
   el("notesScopeAi").addEventListener("click", () => setNotesScope("ai"));
+  el("exportNotesJsonBtn").addEventListener("click", () => exportNotes("json"));
+  el("exportNotesMarkdownBtn").addEventListener("click", () =>
+    exportNotes("markdown"),
+  );
+  el("exportNotesCsvBtn").addEventListener("click", () => exportNotes("csv"));
   el("memoForm").addEventListener("submit", (event) => {
     event.preventDefault();
     saveMemo();

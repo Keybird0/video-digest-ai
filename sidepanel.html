@@ -225,6 +225,20 @@
         </div>
         <span id="notesCount" class="muted"></span>
       </div>
+      <div class="notes-export-bar">
+        <span class="muted">导出当前范围</span>
+        <div class="notes-export-actions">
+          <button id="exportNotesJsonBtn" class="ghost-btn" type="button" title="导出为 JSON">
+            JSON
+          </button>
+          <button id="exportNotesMarkdownBtn" class="ghost-btn" type="button" title="导出为 Markdown">
+            Markdown
+          </button>
+          <button id="exportNotesCsvBtn" class="ghost-btn" type="button" title="导出为 CSV">
+            CSV
+          </button>
+        </div>
+      </div>
       <div id="notesEntries">
         <div id="notesList" class="notes-list"></div>
         <div id="notesEmpty" class="state" hidden>

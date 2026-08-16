@@ -306,6 +306,32 @@ body {
   gap: 6px;
 }
 
+.notes-export-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.notes-export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.notes-export-actions .ghost-btn {
+  padding: 3px 7px;
+  font-size: 11px;
+}
+
+.notes-export-actions .ghost-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .section-heading {
   margin: 18px 14px 8px;
   font-size: 12px;

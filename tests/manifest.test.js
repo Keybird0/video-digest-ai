@@ -231,6 +231,18 @@ test("笔记页提供手记和 AI 记两个独立栏目", () => {
   assert.match(background, /timestampedUrl:\s*canonicalVideoUrl/);
 });
 
+test("笔记页提供 JSON、Markdown 和 CSV 本地导出", () => {
+  const html = readText("sidepanel.html");
+  const sidepanel = readText("sidepanel.js");
+  assert.match(html, /id="exportNotesJsonBtn"/);
+  assert.match(html, /id="exportNotesMarkdownBtn"/);
+  assert.match(html, /id="exportNotesCsvBtn"/);
+  assert.match(sidepanel, /function exportNotes\(format\)/);
+  assert.match(sidepanel, /JSON\.stringify\(/);
+  assert.match(sidepanel, /function notesAsMarkdown\(notes\)/);
+  assert.match(sidepanel, /function notesAsCsv\(notes\)/);
+});
+
 test("笔记范围按本视频、手记、AI 记、全部排列，全部视图汇总所有笔记类型", () => {
   const html = readText("sidepanel.html");
   const sidepanel = readText("sidepanel.js");
