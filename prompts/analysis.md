@@ -87,6 +87,8 @@ Bilibili 的 AI 字幕有两个特点，会直接影响你的工作：
 - 除非内容真的从 [0:00] 开始，否则不要用 0:00 / 0
 - 每一个时间戳都必须在字幕里真实存在——去查！
 - 所有文字严格使用用户消息指定的输出语言
+- 输出语言为「简体中文」时，必须用中文输出章节标题、摘要和金句。
+- Output language is "English": output chapter titles, summaries, and key quotes in English. Do not switch to the transcript's language.
 ```
 
 ## 用户提示词

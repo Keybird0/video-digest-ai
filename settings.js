@@ -208,9 +208,9 @@ var BILI_SETTINGS = (() => {
 
   const DEFAULT_OVERVIEW_PROMPTS = Object.freeze({
     "zh-CN":
-      "请基于完整视频字幕生成结构化概览：按话题转折划分覆盖全片的章节，每章包含准确时间戳、简洁标题和摘要；另外提取 3–5 条有信息量、可独立阅读的金句并保留准确时间戳。不要编造字幕中不存在的信息。",
+      "请基于完整视频字幕生成结构化概览：按话题转折划分覆盖全片的章节，每章包含准确时间戳、简洁标题和摘要；另外提取 3–5 条有信息量、可独立阅读的金句并保留准确时间戳。不要编造字幕中不存在的信息。用中文输出章节标题、摘要和金句。",
     en:
-      "Create a structured overview from the complete video transcript. Divide it into chapters at genuine topic shifts, covering the full timeline; each chapter needs an accurate timestamp, concise title, and summary. Also extract 3–5 informative, standalone key quotes with accurate timestamps. Do not invent information absent from the transcript.",
+      "Create a structured overview from the complete video transcript. Divide it into chapters at genuine topic shifts, covering the full timeline; each chapter needs an accurate timestamp, concise title, and summary. Also extract 3–5 informative, standalone key quotes with accurate timestamps. Do not invent information absent from the transcript. Output in English: chapter titles, summaries, and key quotes must all be in English.",
   });
 
   function normalizeOverviewPrompts(input) {

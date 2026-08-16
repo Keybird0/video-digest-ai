@@ -111,6 +111,11 @@ test("translation.md 的两套语言规则小节都存在且非空", () => {
 });
 
 test("概览提示词明确使用设置中选择的输出语言", () => {
+  const systemPrompt = AI.extractPromptSection(
+    read("analysis.md"),
+    "系统提示词",
+    PROMPTS["analysis.md"],
+  );
   const userPrompt = AI.extractPromptSection(
     read("analysis.md"),
     "用户提示词",
@@ -118,6 +123,8 @@ test("概览提示词明确使用设置中选择的输出语言", () => {
   );
   assert.match(userPrompt, /输出语言：English/);
   assert.match(userPrompt, /章节标题、摘要和金句都必须使用此语言/);
+  assert.match(systemPrompt, /必须用中文输出章节标题、摘要和金句/);
+  assert.match(systemPrompt, /output chapter titles, summaries, and key quotes in English/i);
   assert.match(backgroundSource, /analysisLanguage/);
   assert.match(backgroundSource, /outputLanguage:/);
 });

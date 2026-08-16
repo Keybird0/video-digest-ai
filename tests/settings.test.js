@@ -496,6 +496,8 @@ test("概览提示词有中英文默认值，并保留用户调整", () => {
   const defaults = settings.normalizeAppSettings({}).overviewPrompts;
   assert.ok(defaults["zh-CN"].length > 20);
   assert.ok(defaults.en.length > 20);
+  assert.match(defaults["zh-CN"], /用中文输出/);
+  assert.match(defaults.en, /Output in English/);
 
   const custom = settings.normalizeAppSettings({
     overviewPrompts: { "zh-CN": "只关注行动建议", en: "Focus on actions" },
