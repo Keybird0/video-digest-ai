@@ -113,6 +113,7 @@ var BILI_SETTINGS = (() => {
 
   const DEFAULT_PRESET = PRESETS[0];
   const CUSTOM_PRESET_ID = "custom";
+  const MAX_AI_PROVIDERS = 8;
 
   // YouTube 字幕服务商是独立于 AI Provider 的有序回退链。每项只保存服务商和密钥，
   // 请求地址与鉴权方式由 lib/youtube-api.js 固定，避免用户误把密钥发到错误域名。
@@ -192,7 +193,9 @@ var BILI_SETTINGS = (() => {
   });
 
   const APP_DEFAULTS = Object.freeze({
-    failoverEnabled: false,
+    aiProviders: Object.freeze([
+      Object.freeze({ id: "ai-1", ...DEFAULTS }),
+    ]),
     aiConcurrency: LIMITS.concurrency.default,
     aiTimeoutSeconds: LIMITS.timeoutSeconds.default,
     youtubeCaptionProviders: Object.freeze([
@@ -222,6 +225,46 @@ var BILI_SETTINGS = (() => {
 
   const captionProviderById = (id) =>
     YOUTUBE_CAPTION_PROVIDERS.find((provider) => provider.id === id) || null;
+
+  function normalizeAiProviderId(value, index, usedIds) {
+    const preferred =
+      typeof value === "string" && /^ai-[A-Za-z0-9_-]{1,80}$/.test(value)
+        ? value
+        : `ai-${index + 1}`;
+    let id = preferred;
+    let suffix = 2;
+    while (usedIds.has(id)) {
+      id = `${preferred}-${suffix}`;
+      suffix += 1;
+    }
+    usedIds.add(id);
+    return id;
+  }
+
+  /**
+   * AI 服务是有序回退链。旧版的 primary/backup 配置仍可读取：只有过去启用过
+   * 备用服务时才迁入第二项，避免把未配置的备用卡片变成必填项。
+   */
+  function normalizeAiProviders(input, legacySource = {}) {
+    const legacy = legacySource && typeof legacySource === "object" ? legacySource : {};
+    const hasLegacyRoutes = Boolean(legacy.primaryProvider || legacy.backupProvider);
+    const source = Array.isArray(input)
+      ? input
+      : [
+          hasLegacyRoutes ? legacy.primaryProvider : legacy,
+          hasLegacyRoutes && legacy.failoverEnabled ? legacy.backupProvider : null,
+        ].filter(Boolean);
+    const usedIds = new Set();
+    return source
+      .slice(0, MAX_AI_PROVIDERS)
+      .map((item, index) => {
+        const raw = item && typeof item === "object" ? item : {};
+        return {
+          id: normalizeAiProviderId(raw.id, index, usedIds),
+          ...normalize(raw),
+        };
+      });
+  }
 
   function normalizeYoutubeCaptionProviders(input, legacySupadataApiKey = "") {
     // 有数组即视为用户已明确编辑过列表；即使是空数组也要保留，让用户可以先清空再添加。
@@ -396,33 +439,36 @@ var BILI_SETTINGS = (() => {
   }
 
   /**
-   * 应用级配置把两个完整 provider 档案和全局执行参数分开保存。
-   * 旧版只有一套扁平配置；首次读取时自动把它迁到 primaryProvider。
+   * 应用级配置把有序 provider 列表和全局执行参数分开保存。
+   * 旧版只有一套扁平配置；首次读取时自动把它迁到 aiProviders 列表。
    */
   function normalizeAppSettings(input = {}) {
     const source = input && typeof input === "object" ? input : {};
-    const hasProviderRoutes = !!(source.primaryProvider || source.backupProvider);
-    const primarySource = hasProviderRoutes ? source.primaryProvider : source;
-    const backupSource = hasProviderRoutes
-      ? source.backupProvider
-      : { presetId: "openai", aiApiKey: "", aiModel: "" };
-    const primaryProvider = normalize(primarySource || {});
-    const backupProvider = normalize(backupSource || {});
+    const aiProviders = normalizeAiProviders(source.aiProviders, source);
+    // 保留派生字段，确保旧版调用方与已有本地配置可以平滑过渡；新代码只读取
+    // aiProviders，并且写回时以它为准。
+    const primaryProvider = aiProviders[0] || normalize({});
+    const backupProvider = aiProviders[1] || normalize({
+      presetId: "openai",
+      aiApiKey: "",
+      aiModel: "",
+    });
 
     return {
+      aiProviders,
       primaryProvider,
       backupProvider,
-      failoverEnabled: Boolean(source.failoverEnabled),
+      failoverEnabled: aiProviders.length > 1,
       aiConcurrency: clampNumber(
-        source.aiConcurrency ?? primarySource?.aiConcurrency,
+        source.aiConcurrency ?? primaryProvider.aiConcurrency,
         LIMITS.concurrency,
       ),
       aiTimeoutSeconds: clampNumber(
-        source.aiTimeoutSeconds ?? primarySource?.aiTimeoutSeconds,
+        source.aiTimeoutSeconds ?? primaryProvider.aiTimeoutSeconds,
         LIMITS.timeoutSeconds,
       ),
       subtitleLangPreference: normalizeLangPreference(
-        source.subtitleLangPreference ?? primarySource?.subtitleLangPreference,
+        source.subtitleLangPreference ?? primaryProvider.subtitleLangPreference,
       ),
       // Supadata 单密钥是旧设置格式；首次读取时无感升级为列表的第一项。
       youtubeCaptionProviders: normalizeYoutubeCaptionProviders(
@@ -444,44 +490,36 @@ var BILI_SETTINGS = (() => {
 
   function validateAppSettings(input = {}) {
     const settings = normalizeAppSettings(input);
-    const primary = validate(settings.primaryProvider);
-    const errors = primary.errors.map((error) => `主服务：${error}`);
-    let backup = { ok: true, errors: [], settings: settings.backupProvider };
-
-    if (settings.failoverEnabled) {
-      backup = validate(settings.backupProvider);
-      errors.push(...backup.errors.map((error) => `备用服务：${error}`));
-      if (
-        primary.ok &&
-        backup.ok &&
-        providerFingerprint(primary.settings) === providerFingerprint(backup.settings)
-      ) {
-        errors.push("主服务和备用服务不能使用完全相同的地址与模型。");
-      }
+    const providers = settings.aiProviders.map((provider, index) => ({
+      index,
+      provider,
+      check: validate(provider),
+    }));
+    const errors = [];
+    if (!providers.length) errors.push("请至少添加一个 AI 服务。");
+    for (const { index, check } of providers) {
+      errors.push(...check.errors.map((error) => `AI 服务 ${index + 1}：${error}`));
     }
 
     return {
       ok: errors.length === 0,
       errors,
       settings,
-      primary,
-      backup,
+      providers,
+      // 兼容此前读取 primary/backup 校验结果的调用方。
+      primary: providers[0]?.check || validate(settings.primaryProvider),
+      backup: providers[1]?.check || { ok: true, errors: [], settings: settings.backupProvider },
     };
   }
 
   function activeProviders(input = {}) {
     const settings = normalizeAppSettings(input);
-    const providers = [
-      { role: "primary", label: "主服务", settings: settings.primaryProvider },
-    ];
-    if (settings.failoverEnabled) {
-      providers.push({
-        role: "backup",
-        label: "备用服务",
-        settings: settings.backupProvider,
-      });
-    }
-    return providers;
+    return settings.aiProviders.map((provider, index) => ({
+      id: provider.id,
+      role: index === 0 ? "primary" : "fallback",
+      label: index === 0 ? "主服务" : `备用服务 ${index}`,
+      settings: provider,
+    }));
   }
 
   // 本地推理服务通常不校验密钥，不该因为密钥为空就拦下来。
@@ -499,6 +537,7 @@ var BILI_SETTINGS = (() => {
     PROTOCOLS,
     PRESETS,
     CUSTOM_PRESET_ID,
+    MAX_AI_PROVIDERS,
     DEFAULTS,
     APP_DEFAULTS,
     YOUTUBE_CAPTION_PROVIDERS,
@@ -506,6 +545,7 @@ var BILI_SETTINGS = (() => {
     DEFAULT_OVERVIEW_PROMPTS,
     LIMITS,
     normalize,
+    normalizeAiProviders,
     normalizeAppSettings,
     normalizeYoutubeCaptionProviders,
     normalizeLangPreference,

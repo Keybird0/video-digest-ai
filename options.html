@@ -74,137 +74,24 @@
           <div>
             <h2>AI 服务</h2>
             <p class="hint">
-              主服务处理所有请求；遇到网络中断、超时、限流或服务端故障时，自动切换到备用服务。
+              可配置多个 AI 服务。按从上到下的顺序请求，前一项发生可恢复故障后才会尝试下一项；直接拖动卡片即可调整顺序。
             </p>
           </div>
-          <label class="toggle-row">
-            <input id="failoverEnabled" type="checkbox" />
-            <span>启用备用服务</span>
-          </label>
+          <button id="addAiProviderBtn" class="ghost-btn" type="button">添加 AI 服务</button>
         </div>
 
-        <div class="provider-grid">
-          <article class="provider-card primary-provider" data-provider-role="primary">
-            <div class="provider-title-row">
-              <div>
-                <span class="role-badge role-primary">PRIMARY</span>
-                <h3>主服务</h3>
-              </div>
-              <span class="provider-health" data-field="health">未测试</span>
-            </div>
-            <p class="provider-description">正常情况下优先使用。请配置稳定、额度充足的模型。</p>
-
-            <label class="field">
-              <span class="field-label">服务商</span>
-              <select data-field="preset"></select>
-              <span class="field-hint" data-field="presetHint"></span>
-            </label>
-
-            <div data-field="customFields" hidden>
-              <label class="field">
-                <span class="field-label">API 协议</span>
-                <select data-field="protocol">
-                  <option value="openai">OpenAI 兼容</option>
-                  <option value="anthropic">Anthropic</option>
-                </select>
-              </label>
-              <label class="field">
-                <span class="field-label">API 地址（base_url）</span>
-                <input data-field="baseUrl" type="url" autocomplete="off" spellcheck="false" placeholder="https://api.example.com/v1" />
-                <span class="field-hint">自动拼接 <code data-field="endpointPreview">/chat/completions</code>；明文 HTTP 仅允许本机。</span>
-              </label>
-            </div>
-
-            <label class="field">
-              <span class="field-label">API Key</span>
-              <input data-field="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-..." />
-              <span class="field-hint">本地模型可以留空。</span>
-            </label>
-
-            <label class="field">
-              <span class="field-label">模型</span>
-              <span class="field-row model-field-row">
-                <span class="model-combobox">
-                  <input data-field="model" type="text" autocomplete="off" spellcheck="false" placeholder="模型名" />
-                  <select data-field="modelOptions" class="model-option-select" aria-label="选择主服务模型"></select>
-                </span>
-                <button data-action="models" class="ghost-btn" type="button">拉取模型</button>
-              </span>
-              <span class="field-hint" data-field="modelsHint">可手动填写，或从服务端拉取。</span>
-            </label>
-
-            <div class="provider-actions">
-              <button data-action="test" class="ghost-btn" type="button">测试主服务</button>
-              <span class="status" data-field="status" role="status"></span>
-            </div>
-          </article>
-
-          <article class="provider-card backup-provider" data-provider-role="backup">
-            <div class="provider-title-row">
-              <div>
-                <span class="role-badge role-backup">BACKUP</span>
-                <h3>备用服务</h3>
-              </div>
-              <span class="provider-health" data-field="health">未测试</span>
-            </div>
-            <p class="provider-description">主服务发生可恢复故障时接管后续请求，避免长视频任务整体失败。</p>
-
-            <label class="field">
-              <span class="field-label">服务商</span>
-              <select data-field="preset"></select>
-              <span class="field-hint" data-field="presetHint"></span>
-            </label>
-
-            <div data-field="customFields" hidden>
-              <label class="field">
-                <span class="field-label">API 协议</span>
-                <select data-field="protocol">
-                  <option value="openai">OpenAI 兼容</option>
-                  <option value="anthropic">Anthropic</option>
-                </select>
-              </label>
-              <label class="field">
-                <span class="field-label">API 地址（base_url）</span>
-                <input data-field="baseUrl" type="url" autocomplete="off" spellcheck="false" placeholder="https://api.example.com/v1" />
-                <span class="field-hint">自动拼接 <code data-field="endpointPreview">/chat/completions</code>；明文 HTTP 仅允许本机。</span>
-              </label>
-            </div>
-
-            <label class="field">
-              <span class="field-label">API Key</span>
-              <input data-field="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-..." />
-              <span class="field-hint">请使用与主服务独立的凭据和额度。</span>
-            </label>
-
-            <label class="field">
-              <span class="field-label">模型</span>
-              <span class="field-row model-field-row">
-                <span class="model-combobox">
-                  <input data-field="model" type="text" autocomplete="off" spellcheck="false" placeholder="模型名" />
-                  <select data-field="modelOptions" class="model-option-select" aria-label="选择备用服务模型"></select>
-                </span>
-                <button data-action="models" class="ghost-btn" type="button">拉取模型</button>
-              </span>
-              <span class="field-hint" data-field="modelsHint">可手动填写，或从服务端拉取。</span>
-            </label>
-
-            <div class="provider-actions">
-              <button data-action="test" class="ghost-btn" type="button">测试备用服务</button>
-              <span class="status" data-field="status" role="status"></span>
-            </div>
-          </article>
-        </div>
+        <div id="aiProviderList" class="ai-provider-list"></div>
 
         <div class="execution-settings">
           <label class="field compact-field">
             <span class="field-label">并发数</span>
             <input id="aiConcurrency" type="number" min="1" max="8" step="1" />
-            <span class="field-hint">两个 Provider 共用此并发上限，默认 3。</span>
+            <span class="field-hint">所有 AI 服务共用此并发上限，默认 3。</span>
           </label>
           <label class="field compact-field">
             <span class="field-label">单次请求超时（秒）</span>
             <input id="aiTimeoutSeconds" type="number" min="30" max="600" step="10" />
-            <span class="field-hint">主服务超时后会尝试备用服务。</span>
+            <span class="field-hint">某项服务超时后会尝试下一项服务。</span>
           </label>
         </div>
 
@@ -213,7 +100,7 @@
           <span id="globalStatus" class="status" role="status"></span>
         </div>
         <p class="hint note">
-          保存时 Chrome 会一次性请求当前启用的 Provider 域名权限。仅在网络错误、超时、HTTP 408/409/425/429 或 5xx 时切换；密钥错误、模型错误和请求格式错误不会自动转到备用服务。
+          保存时 Chrome 会一次性请求已配置 AI 服务的域名权限。仅在网络错误、超时、HTTP 408/409/425/429 或 5xx 时尝试下一项；密钥错误、模型错误和请求格式错误不会自动回退。
         </p>
       </section>
     </main>

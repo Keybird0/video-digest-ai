@@ -504,7 +504,7 @@ test("概览提示词有中英文默认值，并保留用户调整", () => {
   assert.equal(custom.en, "Focus on actions");
 });
 
-test("主备 Provider 独立归一化并按顺序返回", () => {
+test("旧主备 Provider 自动迁移为有序 AI 服务列表", () => {
   const app = settings.normalizeAppSettings({
     primaryProvider: custom({
       aiBaseUrl: "https://primary.example.com/v1",
@@ -519,29 +519,30 @@ test("主备 Provider 独立归一化并按顺序返回", () => {
     failoverEnabled: true,
   });
   const providers = settings.activeProviders(app);
-  assert.deepEqual(providers.map((entry) => entry.role), ["primary", "backup"]);
+  assert.deepEqual(providers.map((entry) => entry.role), ["primary", "fallback"]);
   assert.equal(providers[0].settings.aiApiKey, "one");
   assert.equal(providers[1].settings.aiApiKey, "two");
 });
 
-test("启用备用服务后要求两套配置完整且不能完全相同", () => {
+test("AI 服务列表保留顺序、稳定 id，并要求至少配置一项", () => {
   const provider = custom({
     aiBaseUrl: "https://same.example.com/v1",
     aiApiKey: "key",
     aiModel: "same-model",
   });
-  const duplicate = settings.validateAppSettings({
-    primaryProvider: provider,
-    backupProvider: provider,
-    failoverEnabled: true,
+  const app = settings.normalizeAppSettings({
+    aiProviders: [
+      { id: "ai-second", ...provider },
+      { id: "ai-first", ...provider, aiApiKey: "another-key" },
+    ],
   });
-  assert.equal(duplicate.ok, false);
-  assert.match(duplicate.errors.join(" "), /不能使用完全相同/);
+  assert.deepEqual(
+    app.aiProviders.map((item) => item.id),
+    ["ai-second", "ai-first"],
+  );
+  assert.equal(settings.validateAppSettings(app).ok, true);
 
-  const disabled = settings.validateAppSettings({
-    primaryProvider: provider,
-    backupProvider: {},
-    failoverEnabled: false,
-  });
-  assert.equal(disabled.ok, true);
+  const empty = settings.validateAppSettings({ aiProviders: [] });
+  assert.equal(empty.ok, false);
+  assert.match(empty.errors.join(" "), /至少添加一个 AI 服务/);
 });

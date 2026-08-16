@@ -28,37 +28,40 @@ const EN_TEXT = Object.freeze({
   "最多只能添加 8 个字幕服务商。": "You can add up to 8 caption providers.",
   "没有获得已配置字幕服务商的域名权限。": "Host permission was not granted for every configured caption provider.",
   "AI 服务": "AI services",
-  "主服务处理所有请求；遇到网络中断、超时、限流或服务端故障时，自动切换到备用服务。": "The primary handles all requests. Network failures, timeouts, rate limits, or server failures automatically switch to the backup.",
-  "启用备用服务": "Enable backup",
-  "主服务": "Primary",
-  "备用服务": "Backup",
+  "可配置多个 AI 服务。按从上到下的顺序请求，前一项发生可恢复故障后才会尝试下一项；直接拖动卡片即可调整顺序。": "Configure multiple AI services. They are tried from top to bottom; the next service is requested only after a recoverable failure. Drag cards to reorder them.",
+  "添加 AI 服务": "Add AI service",
+  "AI 服务": "AI service",
+  "主服务（首选）": "Primary (preferred)",
+  "备用服务": "Fallback service",
+  "默认优先请求；发生可恢复故障后才会尝试后续服务。": "Requested first; later services are tried only after a recoverable failure.",
+  "前面的服务发生可恢复故障时，才会尝试此服务。": "Tried only after an earlier service has a recoverable failure.",
+  "拖动排序": "Drag to reorder",
+  "AI 服务已保存并授权": "AI services saved and authorized",
+  "尚未添加 AI 服务。": "No AI service added yet.",
+  "最多只能添加 8 个 AI 服务。": "You can add up to 8 AI services.",
+  "请至少添加一个 AI 服务。": "Add at least one AI service.",
   "未测试": "Not tested",
-  "正常情况下优先使用。请配置稳定、额度充足的模型。": "Used first under normal conditions. Choose a stable model with sufficient quota.",
-  "主服务发生可恢复故障时接管后续请求，避免长视频任务整体失败。": "Takes over after a recoverable primary failure so a long-video task can continue.",
   "服务商": "Provider",
   "API 协议": "API protocol",
   "OpenAI 兼容": "OpenAI-compatible",
   "API 地址（base_url）": "API base URL",
   "自动拼接": "The endpoint is appended automatically:",
   "；明文 HTTP 仅允许本机。": "; plain HTTP is allowed only for localhost.",
-  "本地模型可以留空。": "Optional for local models.",
-  "请使用与主服务独立的凭据和额度。": "Use credentials and quota independent from the primary.",
+  "本地模型可以留空。失焦后仅显示前 2 位与后 3 位。": "Optional for local models. When unfocused, only the first 2 and last 3 characters are shown.",
   "模型": "Model",
   "模型名": "Model name",
-  "选择主服务模型": "Choose primary model",
-  "选择备用服务模型": "Choose backup model",
+  "选择 AI 服务模型": "Choose AI service model",
   "选择已获取的模型": "Choose a fetched model",
   "拉取模型": "Fetch models",
   "可手动填写，或从服务端拉取。": "Enter one manually or fetch it from the provider.",
   "DeepSeek 默认模型：deepseek-v4-flash，可直接保存或改为其他模型。": "DeepSeek default: deepseek-v4-flash. Save it as-is or choose another model.",
-  "测试主服务": "Test primary",
-  "测试备用服务": "Test backup",
+  "测试此服务": "Test service",
   "并发数": "Concurrency",
-  "两个 Provider 共用此并发上限，默认 3。": "Both providers share this limit; default: 3.",
+  "所有 AI 服务共用此并发上限，默认 3。": "All AI services share this limit; default: 3.",
   "单次请求超时（秒）": "Request timeout (seconds)",
-  "主服务超时后会尝试备用服务。": "The backup is tried after a primary timeout.",
+  "某项服务超时后会尝试下一项服务。": "The next service is tried after one service times out.",
   "保存模型配置": "Save model configuration",
-  "保存时 Chrome 会一次性请求当前启用的 Provider 域名权限。仅在网络错误、超时、HTTP 408/409/425/429 或 5xx 时切换；密钥错误、模型错误和请求格式错误不会自动转到备用服务。": "Chrome requests host access for all enabled providers in one step. Failover occurs only for network errors, timeouts, HTTP 408/409/425/429, or 5xx responses; key, model, and request-format errors never trigger it.",
+  "保存时 Chrome 会一次性请求已配置 AI 服务的域名权限。仅在网络错误、超时、HTTP 408/409/425/429 或 5xx 时尝试下一项；密钥错误、模型错误和请求格式错误不会自动回退。": "Chrome requests host access for configured AI service domains in one step. Only network errors, timeouts, HTTP 408/409/425/429, or 5xx responses try the next service; key, model, and request-format errors never do.",
   "获取密钥 →": "Get API key →",
   "正在拉取模型…": "Fetching models…",
   "服务没有返回模型列表，请手动填写。": "The provider returned no models; enter one manually.",
@@ -77,7 +80,6 @@ const EN_TEXT = Object.freeze({
   "只有本机地址允许用 http，其余请用 https，否则密钥会明文传输。": "HTTP is allowed only for localhost; use HTTPS elsewhere to protect the API key.",
   "请填写 API 密钥。": "Enter an API key.",
   "请填写模型名，或点「拉取模型列表」选一个。": "Enter a model name or choose one with Fetch models.",
-  "主服务和备用服务不能使用完全相同的地址与模型。": "Primary and backup cannot use the same URL and model.",
   "自定义": "Custom",
   "Google Gemini（OpenAI 兼容端点）": "Google Gemini (OpenAI-compatible endpoint)",
   "月之暗面 Kimi": "Moonshot Kimi",
@@ -161,42 +163,19 @@ const chromeApi = globalThis.chrome?.storage?.local ? globalThis.chrome : {
 
 const storageKey = BILI_SETTINGS.STORAGE_KEY;
 const globalStatus = document.getElementById("globalStatus");
-const failoverEnabled = document.getElementById("failoverEnabled");
 const youtubeEnabled = document.getElementById("youtubeEnabled");
 const bilibiliEnabled = document.getElementById("bilibiliEnabled");
 const siteScopeStatus = document.getElementById("siteScopeStatus");
 const captionProviderList = document.getElementById("captionProviderList");
 const captionProvidersStatus = document.getElementById("captionProvidersStatus");
+const aiProviderList = document.getElementById("aiProviderList");
 const aiConcurrency = document.getElementById("aiConcurrency");
 const aiTimeoutSeconds = document.getElementById("aiTimeoutSeconds");
 let uiLanguage = "zh-CN";
 let overviewPrompts = BILI_SETTINGS.normalizeOverviewPrompts();
 let youtubeCaptionProviders = BILI_SETTINGS.normalizeYoutubeCaptionProviders();
-
-const cards = Object.fromEntries(
-  [...document.querySelectorAll("[data-provider-role]")].map((root) => {
-    const field = (name) => root.querySelector(`[data-field="${name}"]`);
-    return [
-      root.dataset.providerRole,
-      {
-        root,
-        field,
-        preset: field("preset"),
-        protocol: field("protocol"),
-        baseUrl: field("baseUrl"),
-        apiKey: field("apiKey"),
-        model: field("model"),
-        customFields: field("customFields"),
-        presetHint: field("presetHint"),
-        endpointPreview: field("endpointPreview"),
-        modelOptions: field("modelOptions"),
-        modelsHint: field("modelsHint"),
-        health: field("health"),
-        status: field("status"),
-      },
-    ];
-  }),
-);
+let aiProviders = BILI_SETTINGS.normalizeAiProviders();
+let draggedAiProviderId = "";
 
 const statusTimers = new WeakMap();
 
@@ -245,6 +224,37 @@ function updatePresetHint(card, preset) {
   link.rel = "noreferrer";
   link.textContent = translateText("获取密钥 →");
   card.presetHint.appendChild(link);
+}
+
+function maskApiKey(value) {
+  const key = String(value || "");
+  if (!key) return "";
+  // 短于前 2 位与后 3 位的总长度时，没有可安全遮住的中段。
+  if (key.length <= 5) return key;
+  return `${key.slice(0, 2)}${"•".repeat(Math.max(4, key.length - 5))}${key.slice(-3)}`;
+}
+
+function apiKeyValue(input) {
+  return String(input.dataset.secret ?? input.value ?? "");
+}
+
+function setApiKeyValue(input, value) {
+  const key = String(value || "");
+  input.dataset.secret = key;
+  input.value = document.activeElement === input ? key : maskApiKey(key);
+}
+
+function enableApiKeyMask(input) {
+  input.type = "text";
+  input.addEventListener("focus", () => {
+    input.value = apiKeyValue(input);
+  });
+  input.addEventListener("input", () => {
+    input.dataset.secret = input.value;
+  });
+  input.addEventListener("blur", () => {
+    input.value = maskApiKey(apiKeyValue(input));
+  });
 }
 
 function modelOptionValues(card) {
@@ -296,27 +306,25 @@ function setModelOptions(card, input, { showCount = false } = {}) {
   }
 }
 
-function applyPreset(card, { preserveModel = false } = {}) {
+function syncPresetFields(card) {
   const preset = BILI_SETTINGS.presetById(card.preset.value);
   if (!preset) return;
   if (preset.id !== BILI_SETTINGS.CUSTOM_PRESET_ID) {
     card.protocol.value = preset.protocol;
     card.baseUrl.value = preset.baseUrl;
-    if (!preserveModel) card.model.value = preset.model;
   }
   card.customFields.hidden = !isCustom(card);
-  setModelOptions(card, []);
   updatePresetHint(card, preset);
   updateEndpoint(card);
-  setHealth(card, "未测试", "");
 }
 
-function readProvider(card) {
+function readProvider(card, presetId = card.preset.value) {
+  const useCustomFields = presetId === BILI_SETTINGS.CUSTOM_PRESET_ID;
   return BILI_SETTINGS.normalize({
-    presetId: card.preset.value,
-    protocol: isCustom(card) ? card.protocol.value : undefined,
-    aiBaseUrl: isCustom(card) ? card.baseUrl.value : undefined,
-    aiApiKey: card.apiKey.value,
+    presetId,
+    protocol: useCustomFields ? card.protocol.value : undefined,
+    aiBaseUrl: useCustomFields ? card.baseUrl.value : undefined,
+    aiApiKey: apiKeyValue(card.apiKey),
     aiModel: card.model.value,
     availableModels: modelOptionValues(card),
   });
@@ -327,20 +335,326 @@ function writeProvider(card, provider) {
   card.preset.value = settings.presetId;
   card.protocol.value = settings.protocol;
   card.baseUrl.value = settings.aiBaseUrl;
-  card.apiKey.value = settings.aiApiKey;
+  setApiKeyValue(card.apiKey, settings.aiApiKey);
   card.model.value = settings.aiModel;
-  applyPreset(card, { preserveModel: true });
+  syncPresetFields(card);
   card.baseUrl.value = settings.aiBaseUrl;
   setModelOptions(card, settings.availableModels, {
     showCount: settings.availableModels.length > 0,
   });
+  card.currentPresetId = settings.presetId;
+}
+
+function createAiProviderId() {
+  const random = globalThis.crypto?.randomUUID?.().replace(/-/g, "") ||
+    `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
+  return `ai-${random}`;
+}
+
+function createField(labelText) {
+  const field = document.createElement("label");
+  field.className = "field";
+  const label = document.createElement("span");
+  label.className = "field-label";
+  label.textContent = translateText(labelText);
+  field.appendChild(label);
+  return { field, label };
+}
+
+function aiProviderControl(text, { disabled = false, onClick } = {}) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "ghost-btn ai-provider-control";
+  button.textContent = translateText(text);
+  button.disabled = disabled;
+  button.addEventListener("click", onClick);
+  return button;
+}
+
+function createAiProviderCard(provider, index, total) {
+  const root = document.createElement("article");
+  root.className = "provider-card ai-provider-card";
+  root.dataset.aiProvider = "true";
+  root.dataset.aiProviderId = provider.id;
+
+  const card = {
+    root,
+    presetStates: new Map(provider._presetStates || []),
+  };
+  root._aiProviderCard = card;
+
+  const titleRow = document.createElement("div");
+  titleRow.className = "provider-title-row";
+  const title = document.createElement("div");
+  const dragHandle = document.createElement("span");
+  dragHandle.className = "ai-provider-drag-handle";
+  dragHandle.textContent = "⠿";
+  dragHandle.draggable = true;
+  dragHandle.title = translateText("拖动排序");
+  dragHandle.setAttribute("aria-label", translateText("拖动排序"));
+  const badge = document.createElement("span");
+  badge.className = `role-badge ${index === 0 ? "role-primary" : "role-backup"}`;
+  badge.textContent = index === 0 ? "PRIMARY" : "FALLBACK";
+  const heading = document.createElement("h3");
+  heading.textContent = index === 0
+    ? translateText("主服务（首选）")
+    : `${translateText("备用服务")} ${index}`;
+  title.append(dragHandle, badge, heading);
+  const health = document.createElement("span");
+  health.className = "provider-health";
+  health.textContent = translateText("未测试");
+  card.health = health;
+  titleRow.append(title, health);
+
+  const controls = document.createElement("div");
+  controls.className = "ai-provider-controls";
+  controls.append(
+    aiProviderControl("上移", {
+      disabled: index === 0,
+      onClick: () => moveAiProvider(index, -1),
+    }),
+    aiProviderControl("下移", {
+      disabled: index === total - 1,
+      onClick: () => moveAiProvider(index, 1),
+    }),
+    aiProviderControl("删除", { onClick: () => removeAiProvider(provider.id) }),
+  );
+
+  const description = document.createElement("p");
+  description.className = "provider-description";
+  description.textContent = translateText(
+    index === 0
+      ? "默认优先请求；发生可恢复故障后才会尝试后续服务。"
+      : "前面的服务发生可恢复故障时，才会尝试此服务。",
+  );
+
+  const presetField = createField("服务商");
+  const preset = document.createElement("select");
+  card.preset = preset;
+  presetField.field.appendChild(preset);
+  const presetHint = document.createElement("span");
+  presetHint.className = "field-hint";
+  card.presetHint = presetHint;
+  presetField.field.appendChild(presetHint);
+  fillPresets(card);
+
+  const customFields = document.createElement("div");
+  customFields.hidden = true;
+  card.customFields = customFields;
+  const protocolField = createField("API 协议");
+  const protocol = document.createElement("select");
+  protocol.append(
+    new Option(translateText("OpenAI 兼容"), "openai"),
+    new Option("Anthropic", "anthropic"),
+  );
+  card.protocol = protocol;
+  protocolField.field.appendChild(protocol);
+  const baseField = createField("API 地址（base_url）");
+  const baseUrl = document.createElement("input");
+  baseUrl.type = "url";
+  baseUrl.autocomplete = "off";
+  baseUrl.spellcheck = false;
+  baseUrl.placeholder = "https://api.example.com/v1";
+  card.baseUrl = baseUrl;
+  baseField.field.appendChild(baseUrl);
+  const endpointHint = document.createElement("span");
+  endpointHint.className = "field-hint";
+  endpointHint.append(`${translateText("自动拼接")} `);
+  const endpointPreview = document.createElement("code");
+  endpointPreview.textContent = "/chat/completions";
+  card.endpointPreview = endpointPreview;
+  endpointHint.append(endpointPreview, translateText("；明文 HTTP 仅允许本机。"));
+  baseField.field.appendChild(endpointHint);
+  customFields.append(protocolField.field, baseField.field);
+
+  const keyField = createField("API Key");
+  const apiKey = document.createElement("input");
+  apiKey.autocomplete = "off";
+  apiKey.spellcheck = false;
+  apiKey.placeholder = "sk-...";
+  card.apiKey = apiKey;
+  enableApiKeyMask(apiKey);
+  keyField.field.appendChild(apiKey);
+  const keyHint = document.createElement("span");
+  keyHint.className = "field-hint";
+  keyHint.textContent = translateText("本地模型可以留空。失焦后仅显示前 2 位与后 3 位。");
+  keyField.field.appendChild(keyHint);
+
+  const modelField = createField("模型");
+  const modelRow = document.createElement("span");
+  modelRow.className = "field-row model-field-row";
+  const combo = document.createElement("span");
+  combo.className = "model-combobox";
+  const model = document.createElement("input");
+  model.type = "text";
+  model.autocomplete = "off";
+  model.spellcheck = false;
+  model.placeholder = translateText("模型名");
+  card.model = model;
+  const modelOptions = document.createElement("select");
+  modelOptions.className = "model-option-select";
+  modelOptions.setAttribute("aria-label", translateText("选择 AI 服务模型"));
+  card.modelOptions = modelOptions;
+  combo.append(model, modelOptions);
+  const modelsButton = document.createElement("button");
+  modelsButton.type = "button";
+  modelsButton.className = "ghost-btn";
+  modelsButton.textContent = translateText("拉取模型");
+  modelRow.append(combo, modelsButton);
+  modelField.field.appendChild(modelRow);
+  const modelsHint = document.createElement("span");
+  modelsHint.className = "field-hint";
+  card.modelsHint = modelsHint;
+  modelField.field.appendChild(modelsHint);
+
+  const actions = document.createElement("div");
+  actions.className = "provider-actions";
+  const testButton = document.createElement("button");
+  testButton.type = "button";
+  testButton.className = "ghost-btn";
+  testButton.textContent = translateText("测试此服务");
+  const status = document.createElement("span");
+  status.className = "status";
+  status.setAttribute("role", "status");
+  card.status = status;
+  actions.append(testButton, status);
+
+  root.append(titleRow, controls, description, presetField.field, customFields, keyField.field, modelField.field, actions);
+
+  card.presetStates.set(provider.presetId, BILI_SETTINGS.normalize(provider));
+  writeProvider(card, provider);
+  preset.addEventListener("change", () => restoreProviderPreset(card));
+  protocol.addEventListener("change", () => updateEndpoint(card));
+  model.addEventListener("input", () => {
+    modelOptions.value = modelOptionValues(card).includes(model.value.trim())
+      ? model.value.trim()
+      : "";
+  });
+  modelOptions.addEventListener("change", () => {
+    if (!modelOptions.value) return;
+    model.value = modelOptions.value;
+    setHealth(card, "未测试", "");
+  });
+  modelsButton.addEventListener("click", () => fetchModels(card));
+  testButton.addEventListener("click", () => testProvider(card));
+
+  wireAiProviderDrag(root, dragHandle, provider.id);
+  return root;
+}
+
+function restoreProviderPreset(card) {
+  // change 事件触发时 select 已经指向新值；用上次的值保存旧服务商的字段，
+  // 才不会把旧 Key/模型误覆盖到新服务商，或在切回时被清空。
+  const previousPresetId = card.currentPresetId || card.preset.value;
+  card.presetStates.set(previousPresetId, readProvider(card, previousPresetId));
+  const nextPresetId = card.preset.value;
+  writeProvider(card, card.presetStates.get(nextPresetId) || { presetId: nextPresetId });
+  setHealth(card, "未测试", "");
+}
+
+function normalizeUiAiProviders(input = aiProviders) {
+  const raw = Array.isArray(input) ? input : [];
+  const statesById = new Map(raw.map((provider) => [provider?.id, provider?._presetStates]));
+  return BILI_SETTINGS.normalizeAiProviders(raw).map((provider) => ({
+    ...provider,
+    _presetStates: statesById.get(provider.id),
+  }));
+}
+
+function readAiProviders() {
+  return [...aiProviderList.querySelectorAll("[data-ai-provider]")].map((root) => {
+    const card = root._aiProviderCard;
+    return {
+      id: root.dataset.aiProviderId,
+      ...readProvider(card),
+      _presetStates: [...card.presetStates.entries()],
+    };
+  });
+}
+
+function renderAiProviders(input = aiProviders) {
+  const providers = normalizeUiAiProviders(input);
+  aiProviders = providers;
+  aiProviderList.textContent = "";
+  if (!providers.length) {
+    const empty = document.createElement("p");
+    empty.className = "field-hint ai-provider-empty";
+    empty.textContent = translateText("尚未添加 AI 服务。");
+    aiProviderList.appendChild(empty);
+    return;
+  }
+  providers.forEach((provider, index) => {
+    aiProviderList.appendChild(createAiProviderCard(provider, index, providers.length));
+  });
+}
+
+function moveAiProvider(index, direction) {
+  const providers = readAiProviders();
+  const target = index + direction;
+  if (target < 0 || target >= providers.length) return;
+  [providers[index], providers[target]] = [providers[target], providers[index]];
+  renderAiProviders(providers);
+}
+
+function moveAiProviderById(sourceId, targetId) {
+  if (!sourceId || sourceId === targetId) return;
+  const providers = readAiProviders();
+  const sourceIndex = providers.findIndex((provider) => provider.id === sourceId);
+  const targetIndex = providers.findIndex((provider) => provider.id === targetId);
+  if (sourceIndex < 0 || targetIndex < 0) return;
+  const [source] = providers.splice(sourceIndex, 1);
+  providers.splice(targetIndex, 0, source);
+  renderAiProviders(providers);
+}
+
+function wireAiProviderDrag(root, handle, id) {
+  handle.addEventListener("dragstart", (event) => {
+    draggedAiProviderId = id;
+    root.classList.add("dragging");
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", id);
+  });
+  handle.addEventListener("dragend", () => {
+    draggedAiProviderId = "";
+    document.querySelectorAll(".ai-provider-card.dragging, .ai-provider-card.drag-over")
+      .forEach((element) => element.classList.remove("dragging", "drag-over"));
+  });
+  root.addEventListener("dragover", (event) => {
+    if (!draggedAiProviderId || draggedAiProviderId === id) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    root.classList.add("drag-over");
+  });
+  root.addEventListener("dragleave", () => root.classList.remove("drag-over"));
+  root.addEventListener("drop", (event) => {
+    event.preventDefault();
+    const sourceId = event.dataTransfer.getData("text/plain") || draggedAiProviderId;
+    root.classList.remove("drag-over");
+    moveAiProviderById(sourceId, id);
+  });
+}
+
+function addAiProvider() {
+  const providers = readAiProviders();
+  if (providers.length >= BILI_SETTINGS.MAX_AI_PROVIDERS) {
+    showStatus(globalStatus, "最多只能添加 8 个 AI 服务。", { sticky: true, error: true });
+    return;
+  }
+  providers.push({ id: createAiProviderId(), presetId: "deepseek" });
+  renderAiProviders(providers);
+  aiProviderList.querySelectorAll("[data-ai-provider]")
+    .item(providers.length - 1)
+    ?.querySelector("select")
+    ?.focus();
+}
+
+function removeAiProvider(id) {
+  renderAiProviders(readAiProviders().filter((provider) => provider.id !== id));
 }
 
 function currentAppSettings() {
   return BILI_SETTINGS.normalizeAppSettings({
-    primaryProvider: readProvider(cards.primary),
-    backupProvider: readProvider(cards.backup),
-    failoverEnabled: failoverEnabled.checked,
+    aiProviders: readAiProviders(),
     aiConcurrency: aiConcurrency.value,
     aiTimeoutSeconds: aiTimeoutSeconds.value,
     youtubeCaptionProviders: readCaptionProviders(),
@@ -367,13 +681,6 @@ function setHealth(card, text, state) {
   card.health.textContent = translateText(text);
   card.health.classList.toggle("ok", state === "ok");
   card.health.classList.toggle("error", state === "error");
-}
-
-function syncBackupState() {
-  cards.backup.root.setAttribute(
-    "aria-disabled",
-    failoverEnabled.checked ? "false" : "true",
-  );
 }
 
 async function ensurePermissionInteractive(provider) {
@@ -497,7 +804,8 @@ async function save() {
     await notifySiteScopeChanged(appSettings);
     aiConcurrency.value = appSettings.aiConcurrency;
     aiTimeoutSeconds.value = appSettings.aiTimeoutSeconds;
-    showStatus(globalStatus, "主备配置已保存并授权");
+    aiProviders = appSettings.aiProviders;
+    showStatus(globalStatus, "AI 服务已保存并授权");
   } catch (error) {
     showStatus(globalStatus, `保存失败：${error.message}`, {
       sticky: true,
@@ -541,7 +849,7 @@ function readCaptionProviders() {
   return BILI_SETTINGS.normalizeYoutubeCaptionProviders(
     [...captionProviderList.querySelectorAll("[data-caption-provider]")].map((card) => ({
       providerId: card.querySelector('[data-field="captionProviderId"]').value,
-      apiKey: card.querySelector('[data-field="captionApiKey"]').value,
+      apiKey: apiKeyValue(card.querySelector('[data-field="captionApiKey"]')),
     })),
   );
 }
@@ -635,12 +943,12 @@ function renderCaptionProviders(input = youtubeCaptionProviders) {
     keyLabel.className = "field-label";
     keyLabel.textContent = `${profile.label} API Key`;
     const keyInput = document.createElement("input");
-    keyInput.type = "password";
     keyInput.autocomplete = "off";
     keyInput.spellcheck = false;
     keyInput.placeholder = "API Key";
-    keyInput.value = provider.apiKey;
     keyInput.dataset.field = "captionApiKey";
+    enableApiKeyMask(keyInput);
+    setApiKeyValue(keyInput, provider.apiKey);
     keyField.append(keyLabel, keyInput);
 
     const info = document.createElement("section");
@@ -733,7 +1041,6 @@ async function saveCaptionProviders() {
 }
 
 async function load() {
-  Object.values(cards).forEach(fillPresets);
   const stored = await chromeApi.storage.local.get([
     storageKey,
     BILI_SETTINGS.LEGACY_STORAGE_KEY,
@@ -741,9 +1048,7 @@ async function load() {
   const settings = BILI_SETTINGS.normalizeAppSettings(
     stored[storageKey] ?? stored[BILI_SETTINGS.LEGACY_STORAGE_KEY],
   );
-  writeProvider(cards.primary, settings.primaryProvider);
-  writeProvider(cards.backup, settings.backupProvider);
-  failoverEnabled.checked = settings.failoverEnabled;
+  aiProviders = settings.aiProviders;
   aiConcurrency.value = settings.aiConcurrency;
   aiTimeoutSeconds.value = settings.aiTimeoutSeconds;
   youtubeCaptionProviders = settings.youtubeCaptionProviders;
@@ -753,34 +1058,13 @@ async function load() {
   overviewPrompts = { ...settings.overviewPrompts };
   document.documentElement.lang = uiLanguage;
   applyPageLanguage();
+  renderAiProviders(aiProviders);
   renderCaptionProviders(youtubeCaptionProviders);
-  syncBackupState();
 }
 
-for (const card of Object.values(cards)) {
-  card.preset.addEventListener("change", () => applyPreset(card));
-  card.protocol.addEventListener("change", () => updateEndpoint(card));
-  card.model.addEventListener("input", () => {
-    card.modelOptions.value = modelOptionValues(card).includes(card.model.value.trim())
-      ? card.model.value.trim()
-      : "";
-  });
-  card.modelOptions.addEventListener("change", () => {
-    if (!card.modelOptions.value) return;
-    card.model.value = card.modelOptions.value;
-    setHealth(card, "未测试", "");
-  });
-  card.root.querySelector('[data-action="models"]').addEventListener("click", () =>
-    fetchModels(card),
-  );
-  card.root.querySelector('[data-action="test"]').addEventListener("click", () =>
-    testProvider(card),
-  );
-}
-
-failoverEnabled.addEventListener("change", syncBackupState);
 youtubeEnabled.addEventListener("change", saveSiteScope);
 bilibiliEnabled.addEventListener("change", saveSiteScope);
+document.getElementById("addAiProviderBtn").addEventListener("click", addAiProvider);
 document.getElementById("addCaptionProviderBtn").addEventListener("click", addCaptionProvider);
 document
   .getElementById("saveCaptionProvidersBtn")
@@ -790,6 +1074,7 @@ for (const button of document.querySelectorAll("[data-language]")) {
   button.addEventListener("click", async () => {
     uiLanguage = button.dataset.language;
     applyPageLanguage();
+    renderAiProviders(readAiProviders());
     renderCaptionProviders(readCaptionProviders());
     const stored = await chromeApi.storage.local.get([
       storageKey,

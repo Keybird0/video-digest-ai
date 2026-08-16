@@ -145,12 +145,65 @@ select {
   margin-top: 18px;
 }
 
+.ai-provider-list {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
 .provider-card {
   min-width: 0;
   padding: 16px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: color-mix(in srgb, var(--card) 90%, var(--bg));
+}
+
+.ai-provider-card {
+  transition: border-color 120ms ease, opacity 120ms ease, transform 120ms ease;
+}
+
+.ai-provider-card.drag-over {
+  border-color: var(--accent);
+  transform: translateY(2px);
+}
+
+.ai-provider-card.dragging {
+  opacity: 0.45;
+}
+
+.ai-provider-controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  margin-top: -2px;
+}
+
+.ai-provider-control {
+  padding: 4px 7px;
+  font-size: 11px;
+}
+
+.ai-provider-drag-handle {
+  display: inline-grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  margin-right: 4px;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: grab;
+  user-select: none;
+  vertical-align: -2px;
+}
+
+.ai-provider-drag-handle:active {
+  cursor: grabbing;
+}
+
+.ai-provider-empty {
+  margin: 0;
 }
 
 .provider-card[aria-disabled="true"] {

@@ -192,11 +192,31 @@ test("模型选择使用独立 select，不再受 datalist 当前值过滤", () 
   const html = readText("options.html");
   const script = readText("options.js");
   assert.doesNotMatch(html, /<datalist/i);
-  assert.match(html, /<select[^>]+data-field="modelOptions"/i);
+  assert.match(html, /id="aiProviderList"/i);
+  assert.match(script, /modelOptions.className\s*=\s*"model-option-select"/);
   assert.match(script, /setModelOptions/);
   assert.match(script, /availableModels/);
   assert.match(script, /deepseek-v4-flash/);
   assert.match(script, /gpt-5\.6-terra/);
+});
+
+test("AI 服务支持有序多项、拖动排序与局部密钥掩码", () => {
+  const html = readText("options.html");
+  const script = readText("options.js");
+  const settings = readText("settings.js");
+  const background = readText("background.js");
+  assert.match(html, /id="addAiProviderBtn"/);
+  assert.match(html, /id="aiProviderList"/);
+  assert.match(script, /renderAiProviders/);
+  assert.match(script, /wireAiProviderDrag/);
+  assert.match(script, /moveAiProviderById/);
+  assert.match(script, /maskApiKey/);
+  assert.match(script, /key\.slice\(0, 2\)/);
+  assert.match(script, /key\.slice\(-3\)/);
+  assert.match(script, /presetStates/);
+  assert.match(script, /const previousPresetId = card\.currentPresetId/);
+  assert.match(settings, /normalizeAiProviders/);
+  assert.match(background, /尝试下一项 AI 服务/);
 });
 
 test("问 AI 不以字幕成功为前置条件", () => {

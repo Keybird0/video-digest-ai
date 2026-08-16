@@ -27,18 +27,20 @@
 - 两站的 Digest 按钮统一使用海蓝色，Note 在播放器上保持白色高对比文字；设置页可分别开关 YouTube 与 Bilibili，默认全开。
 - 缓存和笔记按站点、视频与分P隔离，全部保存在本机。
 
-## 主备 AI Provider
+## 有序 AI Provider
 
-设置页可以同时配置主服务和备用服务。两套配置分别保存服务商、协议、Base URL、API Key 与模型，并可独立拉取模型列表、申请域名权限和测试连接。已拉取的模型列表会随 Provider 配置保存在本机，下次打开设置仍可从完整列表选择；DeepSeek 默认使用 `deepseek-v4-flash`，也可直接覆盖为其他模型 ID。
+设置页可通过“添加 AI 服务”配置 1–8 个服务。服务卡片按上下顺序排列，可直接拖动调整优先级；每项分别保存服务商、协议、Base URL、API Key 与模型，并可独立拉取模型列表、申请域名权限和测试连接。切换服务商选项后再切回，已填写的该服务商配置会保留。已拉取的模型列表会随 Provider 配置保存在本机，下次打开设置仍可从完整列表选择；DeepSeek 默认使用 `deepseek-v4-flash`，也可直接覆盖为其他模型 ID。
 
-主服务遇到以下可恢复故障时自动切换备用服务：
+请求会从列表顶部开始。当前项遇到以下可恢复故障时，才自动尝试下一项：
 
 - 网络连接失败、响应中断或请求超时
 - HTTP `408`、`409`、`425`、`429`
 - HTTP `5xx`
 - Provider 返回空内容且内部自愈重试仍失败
 
-切换后主服务会在当前 service worker 生命周期内熔断60秒，避免长视频的每个分块重复撞击故障服务。`400/401/403/404`、缺少域名授权、模型名错误和配置不完整不会触发备用服务，以免掩盖需要用户修正的配置问题。
+每次 AI 请求都会按保存的顺序重新尝试；`400/401/403/404`、缺少域名授权、模型名错误和配置不完整不会继续请求后续服务，以免掩盖需要用户修正的配置问题。旧版的主/备配置在首次读取时会自动迁移为有序列表。
+
+为方便核对而不完整暴露密钥，失焦后的 API Key 会显示前 2 位与后 3 位，中间以掩码隐藏；聚焦输入框即可查看和修改完整值。
 
 内置常见服务商预设，包括 DeepSeek、OpenAI、Claude、Gemini、Kimi、GLM、通义千问、火山方舟 Agent Plan、SiliconFlow、OpenRouter 和 Ollama；也支持 OpenAI 兼容接口、Anthropic 原生协议和自定义服务。火山方舟预设使用 Agent Plan 专用的 `/api/plan/v3`，普通按量 API 或 Coding Plan 可通过“自定义”填写各自的 Base URL。远程地址必须使用 HTTPS；HTTP 只允许 localhost 与 127.0.0.1。
 
@@ -61,7 +63,7 @@
 2. 运行 `npm run package`，得到 `dist/video-digest-ai-<version>.zip`。
 3. 解压 ZIP，打开 `chrome://extensions`。
 4. 开启开发者模式，选择“加载已解压的扩展程序”，选中解压目录。
-5. 在自动打开的设置页配置至少一个 YouTube 字幕服务商、主 Provider，并按需启用备用 Provider 或调整“适用范围”。
+5. 在自动打开的设置页配置至少一个 YouTube 字幕服务商和 AI Provider，并按需调整 AI 服务顺序或“适用范围”。
 
 所有密钥只写入 `chrome.storage.local`。扩展没有后端、账户、分析、广告或遥测。
 
@@ -72,7 +74,7 @@ npm test
 npm run package
 ```
 
-自动化测试覆盖字幕解析、Bilibili WBI、YouTube native 请求、缓存隔离、AI 响应校验、主备路由、DOM 注入和侧边栏交互。真实字幕与模型服务仍需在 Chrome 中使用自己的密钥手工验证。
+自动化测试覆盖字幕解析、Bilibili WBI、YouTube native 请求、缓存隔离、AI 响应校验、有序 Provider 路由、DOM 注入和侧边栏交互。真实字幕与模型服务仍需在 Chrome 中使用自己的密钥手工验证。
 
 ## 许可与致谢
 

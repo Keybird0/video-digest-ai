@@ -29,8 +29,6 @@ const AI_MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const MAX_OUTPUT_TOKENS = 32_768;
 const NOTES_STORAGE_KEY = "video_digest_notes";
 const MAX_NOTES = 100;
-const PRIMARY_FAILOVER_COOLDOWN_MS = 60_000;
-const providerHealth = { primaryUnavailableUntil: 0 };
 
 // 内容脚本运行在 B 站页面上下文，不应读到密钥或缓存。
 chrome.storage.local
@@ -531,13 +529,10 @@ async function requestAiCompletion({
       aiTimeoutSeconds: appSettings.aiTimeoutSeconds,
     },
   }));
-  const providers = VIDEO_PROVIDER_ROUTER.routeOrder(configured, {
-    now: Date.now(),
-    primaryUnavailableUntil: providerHealth.primaryUnavailableUntil,
-  });
+  const providers = VIDEO_PROVIDER_ROUTER.routeOrder(configured);
   const failures = [];
 
-  for (const provider of providers) {
+  for (const [index, provider] of providers.entries()) {
     try {
       const result = await requestProviderCompletion(provider.settings, {
         messages,
@@ -545,36 +540,27 @@ async function requestAiCompletion({
         temperature,
         responseFormat,
       });
-      if (provider.role === "primary") providerHealth.primaryUnavailableUntil = 0;
       return { ...result, providerRole: provider.role };
     } catch (error) {
       failures.push({ provider, error });
-      const canFailOver = VIDEO_PROVIDER_ROUTER.shouldFailOver(
-        provider.role,
-        appSettings.failoverEnabled,
-        error,
-      );
-      if (!canFailOver) throw error;
-      providerHealth.primaryUnavailableUntil =
-        Date.now() + PRIMARY_FAILOVER_COOLDOWN_MS;
+      if (!VIDEO_PROVIDER_ROUTER.shouldFailOver(error)) throw error;
+      if (index >= providers.length - 1) break;
       console.warn(
-        `[Video Digest AI] 主服务暂时不可用，切换备用服务：${error.message}`,
+        `[Video Digest AI] ${provider.label} 暂时不可用，尝试下一项 AI 服务：${error.message}`,
       );
     }
   }
 
-  const primaryFailure = failures.find(({ provider }) => provider.role === "primary");
-  const backupFailure = failures.find(({ provider }) => provider.role === "backup");
-  const error = new Error(
-    backupFailure
-      ? `主服务失败：${primaryFailure?.error.message || "暂不可用"}；备用服务失败：${backupFailure.error.message}`
-      : primaryFailure?.error.message || "没有可用的 AI Provider。",
-  );
+  const error = new Error(failures.length
+    ? `所有 AI 服务均失败。${failures
+      .map(({ provider, error: failure }) => `${provider.label}：${failure.message || "暂不可用"}`)
+      .join("；")}`
+    : "没有可用的 AI 服务。");
   error.code = "AI_ALL_PROVIDERS_FAILED";
   throw error;
 }
 
-// 单个 Provider 内部仍保留空响应的自愈重试；用尽后才交给主备路由判断。
+// 单个 Provider 内部仍保留空响应的自愈重试；用尽后才交给有序回退路由判断。
 async function requestProviderCompletion(
   settings,
   { messages, maxTokens, temperature, responseFormat },
