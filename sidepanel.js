@@ -118,7 +118,8 @@ const SIDE_PANEL_EN = Object.freeze({
   "回答中…": "Answering…",
   "概览生成失败": "Overview generation failed",
   "概览提示词（可调整）": "Overview prompt (editable)",
-  "恢复默认": "Restore default",
+  "恢复中文默认": "Restore Chinese default",
+  "恢复英文默认": "Restore English default",
   "修改会自动保存在本机，并用于下一次生成。":
     "Changes are saved locally and used for the next generation.",
   "已自动保存": "Saved automatically",
@@ -1190,10 +1191,13 @@ function updateOverviewPrompt() {
   overviewPromptSaveTimer = setTimeout(() => persistOverviewPrompts(), 400);
 }
 
-function resetOverviewPrompt() {
-  const language = state.uiLanguage === "en" ? "en" : "zh-CN";
-  state.overviewPrompts[language] = BILI_SETTINGS.DEFAULT_OVERVIEW_PROMPTS[language];
-  renderOverviewPrompt();
+function resetOverviewPrompt(language) {
+  const targetLanguage = language === "en" ? "en" : "zh-CN";
+  state.overviewPrompts[targetLanguage] =
+    BILI_SETTINGS.DEFAULT_OVERVIEW_PROMPTS[targetLanguage];
+  if ((state.uiLanguage === "en" ? "en" : "zh-CN") === targetLanguage) {
+    renderOverviewPrompt();
+  }
   clearTimeout(overviewPromptSaveTimer);
   persistOverviewPrompts();
 }
@@ -1976,7 +1980,12 @@ function setupEventListeners() {
   el("analyzeBtn").addEventListener("click", () => analyze());
   el("reanalyzeBtn").addEventListener("click", () => analyze({ force: true }));
   el("overviewPrompt").addEventListener("input", updateOverviewPrompt);
-  el("resetOverviewPromptBtn").addEventListener("click", resetOverviewPrompt);
+  el("resetOverviewPromptZhBtn").addEventListener("click", () =>
+    resetOverviewPrompt("zh-CN"),
+  );
+  el("resetOverviewPromptEnBtn").addEventListener("click", () =>
+    resetOverviewPrompt("en"),
+  );
   el("notesScopeVideo").addEventListener("click", () => setNotesScope("video"));
   el("notesScopeAll").addEventListener("click", () => setNotesScope("all"));
   el("notesScopeMemo").addEventListener("click", () => setNotesScope("memo"));

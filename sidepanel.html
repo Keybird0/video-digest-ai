@@ -200,7 +200,14 @@
       <section class="overview-prompt-editor">
         <div class="overview-prompt-head">
           <label for="overviewPrompt">概览提示词（可调整）</label>
-          <button id="resetOverviewPromptBtn" class="ghost-btn" type="button">恢复默认</button>
+          <div class="overview-prompt-reset-actions">
+            <button id="resetOverviewPromptZhBtn" class="ghost-btn" type="button">
+              恢复中文默认
+            </button>
+            <button id="resetOverviewPromptEnBtn" class="ghost-btn" type="button">
+              恢复英文默认
+            </button>
+          </div>
         </div>
         <textarea id="overviewPrompt" rows="7" maxlength="5000"></textarea>
         <p id="overviewPromptStatus" class="muted">修改会自动保存在本机，并用于下一次生成。</p>

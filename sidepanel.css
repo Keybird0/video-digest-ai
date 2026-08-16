@@ -832,6 +832,13 @@ body {
   font-weight: 600;
 }
 
+.overview-prompt-reset-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
 .overview-prompt-editor textarea {
   display: block;
   width: 100%;
