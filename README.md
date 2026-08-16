@@ -23,7 +23,6 @@
 - “问 AI”回答支持安全 Markdown 渲染；概览提示词可直接在侧边栏调整、自动保存并恢复默认。
 - “手记”支持随时输入并保存文字；在视频页记录时会同时保存视频标题和当前播放位置的访问锚点。
 - “AI 记”单独收纳从问答中保存的内容；无论是否打开视频，AI 回答都能一键保存。
-- 笔记可导出为 JSON、Markdown、CSV；也可配置飞书多维表格 Webhook，逐条或一键同步全部笔记。所有笔记类型均使用同一份 JSON 结构，方便飞书工作流统一映射为记录。
 - 划词解释；播放器按钮或 `n` 快捷键保存时间戳笔记。
 - 两站的 Digest 按钮统一使用海蓝色，Note 在播放器上保持白色高对比文字；设置页可分别开关 YouTube 与 Bilibili，默认全开。
 - 缓存和笔记按站点、视频与分P隔离，全部保存在本机。
@@ -55,38 +54,6 @@
 - [TranscriptAPI](https://transcriptapi.com/docs/api/)：返回带时间戳的 YouTube 字幕，并支持服务端语言优先级。
 
 扩展会缓存已获取的字幕；缓存命中不会重新请求，手动“重新获取字幕”可能再次消耗服务商额度。套餐、额度和计费规则会变化，请以设置页每个服务商提供的官方文档和控制台说明为准。
-
-## 飞书多维表格同步
-
-在设置页“飞书多维表格同步”中粘贴目标自动化流程的 Webhook 地址即可启用。先在多维表格创建自动化，触发条件选择“接收到 webhook 时”，再添加“新增记录”动作并映射 `note` 中的字段；官方步骤见[使用自动化流程的 Webhook 触发](https://www.feishu.cn/hc/zh-CN/articles/612376356355-%E4%BD%BF%E7%94%A8%E8%87%AA%E5%8A%A8%E5%8C%96%E6%B5%81%E7%A8%8B%E7%9A%84-webhook-%E8%A7%A6%E5%8F%91)。
-
-单条和批量同步均为每条笔记发送一条 `POST` 请求，载荷稳定为：
-
-```json
-{
-  "event": "video_digest.note.sync",
-  "schemaVersion": 1,
-  "sentAt": "2026-08-16T00:00:00.000Z",
-  "note": {
-    "id": "note_…",
-    "kind": "quote | memo | ai_note | ai_chat",
-    "text": "笔记正文",
-    "rawText": "原文或 null",
-    "createdAt": "…",
-    "site": "youtube | bilibili | null",
-    "videoId": "… | null",
-    "page": 1,
-    "videoTitle": "… | null",
-    "ownerName": "… | null",
-    "timestamp": "1:23 | null",
-    "timestampSeconds": 83,
-    "sourceUrl": "… | null",
-    "pending": false
-  }
-}
-```
-
-可选填写飞书自动化的 Bearer Token，并开启“保存笔记后自动同步”。测试连接会创建一条 `sync_test` 记录；如果工作流始终“新增记录”，重复同步会产生重复记录。需要幂等时，请在工作流中以稳定的 `note.id` 查找并更新已有记录。为遵守飞书限流，批量同步会逐条发送；未配置 Bearer Token 时按约 1 条/秒发送，配置后按最多约 4 条/秒发送。
 
 ## 本地安装
 
