@@ -468,6 +468,30 @@ test("适用范围默认全开，只有显式 false 才关闭对应网站", () =
   assert.equal(scoped.bilibiliEnabled, true);
 });
 
+test("YouTube 字幕服务商默认 Supadata，并将旧单密钥迁移到有序列表", () => {
+  const defaults = settings.normalizeAppSettings({}).youtubeCaptionProviders;
+  assert.deepEqual(defaults, [{ providerId: "supadata", apiKey: "" }]);
+
+  const migrated = settings.normalizeAppSettings({ supadataApiKey: "  old-key  " });
+  assert.deepEqual(migrated.youtubeCaptionProviders, [
+    { providerId: "supadata", apiKey: "old-key" },
+  ]);
+});
+
+test("YouTube 字幕服务商保留顺序并丢弃未知项", () => {
+  const providers = settings.normalizeAppSettings({
+    youtubeCaptionProviders: [
+      { providerId: "transcriptapi", apiKey: "api-key" },
+      { providerId: "unknown", apiKey: "should-drop" },
+      { providerId: "captapi", apiKey: "capt-key" },
+    ],
+  }).youtubeCaptionProviders;
+  assert.deepEqual(providers, [
+    { providerId: "transcriptapi", apiKey: "api-key" },
+    { providerId: "captapi", apiKey: "capt-key" },
+  ]);
+});
+
 test("概览提示词有中英文默认值，并保留用户调整", () => {
   const defaults = settings.normalizeAppSettings({}).overviewPrompts;
   assert.ok(defaults["zh-CN"].length > 20);

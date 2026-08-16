@@ -373,9 +373,9 @@ async function handleFetchTranscript(
     if (resource.site === "youtube") {
       const [pageInfo, transcriptResult] = await Promise.all([
         readYouTubePageInfo(tabId),
-        VIDEO_YOUTUBE_API.fetchTranscript(
+        VIDEO_YOUTUBE_API.fetchTranscriptWithFallback(
           resource.videoId,
-          settings.supadataApiKey,
+          settings.youtubeCaptionProviders,
         ),
       ]);
       entries = transcriptResult.transcript;

@@ -11,28 +11,22 @@ const EN_TEXT = Object.freeze({
   "普通视频、合集与分P": "Videos, collections, and multi-part pages",
   "修改后自动保存，并同步到已打开的视频页。": "Changes are saved automatically and applied to open video pages.",
   "适用范围已保存": "Site availability saved",
-  "字幕服务": "Caption service",
-  "Bilibili 字幕直接读取平台接口；YouTube 原生字幕通过 Supadata 获取，不下载音频，也不做语音转写。": "Bilibili captions are read from the platform API. Native YouTube captions are fetched through Supadata; audio is never downloaded or transcribed.",
-  "用于 YouTube 原生字幕": "For native YouTube captions",
-  "只保存在本机扩展存储，并只发送给 api.supadata.ai。": "Stored only in local extension storage and sent only to api.supadata.ai.",
-  "保存": "Save",
-  "字幕服务密钥已保存": "Caption service key saved",
-  "如何申请 API Key": "How to get an API key",
-  "打开 Supadata 控制台 ↗": "Open Supadata dashboard ↗",
-  "注册或登录 Supadata；免费档不要求绑定信用卡。": "Sign up or sign in to Supadata; the free plan does not require a credit card.",
-  "进入控制台的 API Keys 页面，创建并复制一个 Key。": "Open API Keys in the dashboard, then create and copy a key.",
-  "粘贴到上方输入框，然后点击页面底部的保存按钮。": "Paste it above, then use the save button at the bottom of this page.",
-  "免费额度与使用限制": "Free quota and usage limits",
-  "官方规则 · 2026-08 查询": "Official rules · checked 2026-08",
-  "免费档为每月 100 credits、限速 1 次/秒；没有单独的每日固定次数。": "The free plan includes 100 credits per month at 1 request/second; there is no separate fixed daily quota.",
-  "本扩展只请求原生字幕：一次成功查询通常消耗 1 credit；字幕不可用的 206 响应也消耗 1 credit。": "This extension requests native captions only: a successful lookup normally costs 1 credit, and a 206 Transcript Unavailable response also costs 1 credit.",
-  "额度不会结转到下月；用完后需等待额度刷新或升级套餐。缓存命中不会重新请求，手动“重新获取字幕”可能再次计费。": "Credits do not roll over. After the quota is exhausted, wait for renewal or upgrade. Cache hits make no new request; manually refreshing captions may be billed again.",
-  "仅支持公开、已结束且有平台字幕的视频；私密、登录/年龄/地区受限视频和直播可能无法获取。": "Only public, completed videos with platform captions are supported. Private, sign-in/age/region-restricted videos and live streams may be unavailable.",
-  "套餐、额度和计费规则可能调整，请以": "Plans, quotas, and billing may change. Always check the live",
-  "官方定价页": "pricing page",
-  "与": "and",
-  "字幕 API 文档": "Transcript API documentation",
-  "的实时说明为准。": "for the latest rules.",
+  "YouTube 字幕服务": "YouTube caption services",
+  "Bilibili 字幕直接读取平台接口。YouTube 可配置多个字幕服务商，按从上到下的顺序尝试；上一项失败后才会请求下一项。": "Bilibili captions are read from the platform API. Configure multiple YouTube caption providers; they are tried from top to bottom, and the next provider is requested only after the previous one fails.",
+  "添加字幕服务商": "Add caption provider",
+  "保存字幕服务商": "Save caption providers",
+  "API Key 仅保存在本机扩展存储，且只会发送给对应服务商。保存时 Chrome 会请求已配置服务商的域名访问权限。": "API keys are stored only in local extension storage and sent only to their matching provider. Saving requests Chrome host access for configured provider domains.",
+  "字幕服务商": "Caption provider",
+  "服务商说明": "Provider notes",
+  "申请 API Key ↗": "Get API key ↗",
+  "查看 API 文档、额度与限制 ↗": "View API docs, quota & limits ↗",
+  "上移": "Move up",
+  "下移": "Move down",
+  "删除": "Remove",
+  "尚未添加字幕服务商。": "No caption provider added yet.",
+  "字幕服务商已保存": "Caption providers saved",
+  "最多只能添加 8 个字幕服务商。": "You can add up to 8 caption providers.",
+  "没有获得已配置字幕服务商的域名权限。": "Host permission was not granted for every configured caption provider.",
   "AI 服务": "AI services",
   "主服务处理所有请求；遇到网络中断、超时、限流或服务端故障时，自动切换到备用服务。": "The primary handles all requests. Network failures, timeouts, rate limits, or server failures automatically switch to the backup.",
   "启用备用服务": "Enable backup",
@@ -171,12 +165,13 @@ const failoverEnabled = document.getElementById("failoverEnabled");
 const youtubeEnabled = document.getElementById("youtubeEnabled");
 const bilibiliEnabled = document.getElementById("bilibiliEnabled");
 const siteScopeStatus = document.getElementById("siteScopeStatus");
-const supadataApiKey = document.getElementById("supadataApiKey");
-const supadataStatus = document.getElementById("supadataStatus");
+const captionProviderList = document.getElementById("captionProviderList");
+const captionProvidersStatus = document.getElementById("captionProvidersStatus");
 const aiConcurrency = document.getElementById("aiConcurrency");
 const aiTimeoutSeconds = document.getElementById("aiTimeoutSeconds");
 let uiLanguage = "zh-CN";
 let overviewPrompts = BILI_SETTINGS.normalizeOverviewPrompts();
+let youtubeCaptionProviders = BILI_SETTINGS.normalizeYoutubeCaptionProviders();
 
 const cards = Object.fromEntries(
   [...document.querySelectorAll("[data-provider-role]")].map((root) => {
@@ -348,7 +343,7 @@ function currentAppSettings() {
     failoverEnabled: failoverEnabled.checked,
     aiConcurrency: aiConcurrency.value,
     aiTimeoutSeconds: aiTimeoutSeconds.value,
-    supadataApiKey: supadataApiKey.value,
+    youtubeCaptionProviders: readCaptionProviders(),
     youtubeEnabled: youtubeEnabled.checked,
     bilibiliEnabled: bilibiliEnabled.checked,
     uiLanguage,
@@ -386,6 +381,16 @@ async function ensurePermissionInteractive(provider) {
   if (!origin) throw new Error("API 地址不合法。");
   if (await chromeApi.permissions.contains({ origins: [origin] })) return true;
   return chromeApi.permissions.request({ origins: [origin] });
+}
+
+async function requestMissingOrigins(origins, deniedMessage) {
+  const missing = [];
+  for (const origin of origins) {
+    if (!(await chromeApi.permissions.contains({ origins: [origin] }))) missing.push(origin);
+  }
+  if (missing.length && !(await chromeApi.permissions.request({ origins: missing }))) {
+    throw new Error(deniedMessage);
+  }
 }
 
 async function fetchModels(card) {
@@ -475,16 +480,19 @@ async function save() {
 
   const origins = [
     ...new Set(
-      BILI_SETTINGS.activeProviders(appSettings)
-        .map(({ settings }) => BILI_SETTINGS.originOf(settings.aiBaseUrl))
-        .filter(Boolean),
+      [
+        ...BILI_SETTINGS.activeProviders(appSettings)
+          .map(({ settings }) => BILI_SETTINGS.originOf(settings.aiBaseUrl)),
+        ...appSettings.youtubeCaptionProviders
+          .filter((provider) => provider.apiKey)
+          .map((provider) => BILI_SETTINGS.captionProviderById(provider.providerId)?.origin),
+      ].filter(Boolean),
     ),
   ];
 
   try {
     // 一次请求两个 origin，确保仍在同一个用户点击手势里。
-    const granted = await chromeApi.permissions.request({ origins });
-    if (!granted) throw new Error("没有获得所有已启用 Provider 的域名权限。");
+    await requestMissingOrigins(origins, "没有获得所有已启用 Provider 的域名权限。");
     await chromeApi.storage.local.set({ [storageKey]: appSettings });
     await notifySiteScopeChanged(appSettings);
     aiConcurrency.value = appSettings.aiConcurrency;
@@ -528,7 +536,169 @@ async function saveSiteScope() {
   }
 }
 
-async function saveSupadataKey() {
+function readCaptionProviders() {
+  if (!captionProviderList.children.length) return [];
+  return BILI_SETTINGS.normalizeYoutubeCaptionProviders(
+    [...captionProviderList.querySelectorAll("[data-caption-provider]")].map((card) => ({
+      providerId: card.querySelector('[data-field="captionProviderId"]').value,
+      apiKey: card.querySelector('[data-field="captionApiKey"]').value,
+    })),
+  );
+}
+
+function providerDetail(profile) {
+  return uiLanguage === "en" ? profile.detailEn : profile.detail;
+}
+
+function captionProviderButton(text, { disabled = false, onClick } = {}) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "ghost-btn caption-provider-control";
+  button.textContent = translateText(text);
+  button.disabled = disabled;
+  button.addEventListener("click", onClick);
+  return button;
+}
+
+function renderCaptionProviders(input = youtubeCaptionProviders) {
+  const providers = BILI_SETTINGS.normalizeYoutubeCaptionProviders(input);
+  youtubeCaptionProviders = providers;
+  captionProviderList.textContent = "";
+
+  if (!providers.length) {
+    const empty = document.createElement("p");
+    empty.className = "field-hint caption-provider-empty";
+    empty.textContent = translateText("尚未添加字幕服务商。");
+    captionProviderList.appendChild(empty);
+    return;
+  }
+
+  providers.forEach((provider, index) => {
+    const profile = BILI_SETTINGS.captionProviderById(provider.providerId);
+    if (!profile) return;
+
+    const card = document.createElement("article");
+    card.className = "caption-provider-card";
+    card.dataset.captionProvider = "true";
+
+    const header = document.createElement("div");
+    header.className = "caption-provider-header";
+    const title = document.createElement("div");
+    title.className = "caption-provider-title";
+    const order = document.createElement("span");
+    order.className = "caption-provider-order";
+    order.textContent = String(index + 1);
+    const label = document.createElement("strong");
+    label.textContent = translateText("字幕服务商");
+    title.append(order, label);
+
+    const controls = document.createElement("div");
+    controls.className = "caption-provider-controls";
+    controls.append(
+      captionProviderButton("上移", {
+        disabled: index === 0,
+        onClick: () => moveCaptionProvider(index, -1),
+      }),
+      captionProviderButton("下移", {
+        disabled: index === providers.length - 1,
+        onClick: () => moveCaptionProvider(index, 1),
+      }),
+      captionProviderButton("删除", { onClick: () => removeCaptionProvider(index) }),
+    );
+    header.append(title, controls);
+
+    const providerField = document.createElement("label");
+    providerField.className = "field";
+    const providerLabel = document.createElement("span");
+    providerLabel.className = "field-label";
+    providerLabel.textContent = translateText("服务商");
+    const providerSelect = document.createElement("select");
+    providerSelect.dataset.field = "captionProviderId";
+    for (const optionProfile of BILI_SETTINGS.YOUTUBE_CAPTION_PROVIDERS) {
+      const option = document.createElement("option");
+      option.value = optionProfile.id;
+      option.textContent = optionProfile.label;
+      providerSelect.appendChild(option);
+    }
+    providerSelect.value = provider.providerId;
+    providerSelect.addEventListener("change", () => {
+      const next = readCaptionProviders();
+      // 不同服务商的密钥不可复用，切换时主动清空，避免误发到另一个域名。
+      next[index] = { providerId: providerSelect.value, apiKey: "" };
+      renderCaptionProviders(next);
+    });
+    providerField.append(providerLabel, providerSelect);
+
+    const keyField = document.createElement("label");
+    keyField.className = "field";
+    const keyLabel = document.createElement("span");
+    keyLabel.className = "field-label";
+    keyLabel.textContent = `${profile.label} API Key`;
+    const keyInput = document.createElement("input");
+    keyInput.type = "password";
+    keyInput.autocomplete = "off";
+    keyInput.spellcheck = false;
+    keyInput.placeholder = "API Key";
+    keyInput.value = provider.apiKey;
+    keyInput.dataset.field = "captionApiKey";
+    keyField.append(keyLabel, keyInput);
+
+    const info = document.createElement("section");
+    info.className = "caption-provider-info";
+    const infoTitle = document.createElement("strong");
+    infoTitle.textContent = translateText("服务商说明");
+    const detail = document.createElement("p");
+    detail.textContent = providerDetail(profile);
+    const links = document.createElement("p");
+    links.className = "caption-provider-links";
+    const dashboard = document.createElement("a");
+    dashboard.href = profile.dashboardUrl;
+    dashboard.target = "_blank";
+    dashboard.rel = "noreferrer";
+    dashboard.textContent = translateText("申请 API Key ↗");
+    const docs = document.createElement("a");
+    docs.href = profile.docsUrl;
+    docs.target = "_blank";
+    docs.rel = "noreferrer";
+    docs.textContent = translateText("查看 API 文档、额度与限制 ↗");
+    links.append(dashboard, docs);
+    info.append(infoTitle, detail, links);
+
+    card.append(header, providerField, keyField, info);
+    captionProviderList.appendChild(card);
+  });
+}
+
+function moveCaptionProvider(index, direction) {
+  const providers = readCaptionProviders();
+  const target = index + direction;
+  if (target < 0 || target >= providers.length) return;
+  [providers[index], providers[target]] = [providers[target], providers[index]];
+  renderCaptionProviders(providers);
+}
+
+function removeCaptionProvider(index) {
+  const providers = readCaptionProviders();
+  providers.splice(index, 1);
+  renderCaptionProviders(providers);
+}
+
+function addCaptionProvider() {
+  const providers = readCaptionProviders();
+  if (providers.length >= BILI_SETTINGS.MAX_YOUTUBE_CAPTION_PROVIDERS) {
+    showStatus(captionProvidersStatus, "最多只能添加 8 个字幕服务商。", {
+      sticky: true,
+      error: true,
+    });
+    return;
+  }
+  providers.push({ providerId: "supadata", apiKey: "" });
+  renderCaptionProviders(providers);
+  const cards = captionProviderList.querySelectorAll("[data-caption-provider]");
+  cards[cards.length - 1]?.querySelector('[data-field="captionApiKey"]')?.focus();
+}
+
+async function saveCaptionProviders() {
   try {
     const stored = await chromeApi.storage.local.get([
       storageKey,
@@ -537,15 +707,25 @@ async function saveSupadataKey() {
     const settings = BILI_SETTINGS.normalizeAppSettings(
       stored[storageKey] ?? stored[BILI_SETTINGS.LEGACY_STORAGE_KEY],
     );
-    const next = {
+    const providers = readCaptionProviders();
+    const next = BILI_SETTINGS.normalizeAppSettings({
       ...settings,
-      supadataApiKey: supadataApiKey.value.trim(),
-    };
+      youtubeCaptionProviders: providers,
+    });
+    const origins = [
+      ...new Set(
+        next.youtubeCaptionProviders
+          .filter((provider) => provider.apiKey)
+          .map((provider) => BILI_SETTINGS.captionProviderById(provider.providerId)?.origin)
+          .filter(Boolean),
+      ),
+    ];
+    await requestMissingOrigins(origins, "没有获得已配置字幕服务商的域名权限。");
     await chromeApi.storage.local.set({ [storageKey]: next });
-    supadataApiKey.value = next.supadataApiKey;
-    showStatus(supadataStatus, "字幕服务密钥已保存");
+    renderCaptionProviders(next.youtubeCaptionProviders);
+    showStatus(captionProvidersStatus, "字幕服务商已保存");
   } catch (error) {
-    showStatus(supadataStatus, `保存失败：${error.message}`, {
+    showStatus(captionProvidersStatus, `保存失败：${error.message}`, {
       sticky: true,
       error: true,
     });
@@ -566,13 +746,14 @@ async function load() {
   failoverEnabled.checked = settings.failoverEnabled;
   aiConcurrency.value = settings.aiConcurrency;
   aiTimeoutSeconds.value = settings.aiTimeoutSeconds;
-  supadataApiKey.value = settings.supadataApiKey;
+  youtubeCaptionProviders = settings.youtubeCaptionProviders;
   youtubeEnabled.checked = settings.youtubeEnabled;
   bilibiliEnabled.checked = settings.bilibiliEnabled;
   uiLanguage = settings.uiLanguage;
   overviewPrompts = { ...settings.overviewPrompts };
   document.documentElement.lang = uiLanguage;
   applyPageLanguage();
+  renderCaptionProviders(youtubeCaptionProviders);
   syncBackupState();
 }
 
@@ -600,12 +781,16 @@ for (const card of Object.values(cards)) {
 failoverEnabled.addEventListener("change", syncBackupState);
 youtubeEnabled.addEventListener("change", saveSiteScope);
 bilibiliEnabled.addEventListener("change", saveSiteScope);
-document.getElementById("saveSupadataBtn").addEventListener("click", saveSupadataKey);
+document.getElementById("addCaptionProviderBtn").addEventListener("click", addCaptionProvider);
+document
+  .getElementById("saveCaptionProvidersBtn")
+  .addEventListener("click", saveCaptionProviders);
 document.getElementById("saveBtn").addEventListener("click", save);
 for (const button of document.querySelectorAll("[data-language]")) {
   button.addEventListener("click", async () => {
     uiLanguage = button.dataset.language;
     applyPageLanguage();
+    renderCaptionProviders(readCaptionProviders());
     const stored = await chromeApi.storage.local.get([
       storageKey,
       BILI_SETTINGS.LEGACY_STORAGE_KEY,

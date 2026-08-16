@@ -322,6 +322,96 @@ select {
   margin-top: 18px;
 }
 
+.caption-provider-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.caption-provider-card {
+  padding: 15px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--bg) 72%, var(--card));
+}
+
+.caption-provider-header,
+.caption-provider-title,
+.caption-provider-controls,
+.caption-provider-links,
+.caption-provider-actions {
+  display: flex;
+  align-items: center;
+}
+
+.caption-provider-header {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.caption-provider-title,
+.caption-provider-controls,
+.caption-provider-links {
+  gap: 7px;
+}
+
+.caption-provider-title strong {
+  font-size: 13px;
+}
+
+.caption-provider-order {
+  display: inline-grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.caption-provider-control {
+  padding: 4px 7px;
+  font-size: 11px;
+}
+
+.caption-provider-info {
+  margin-top: 14px;
+  padding: 11px 12px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--card) 76%, var(--bg));
+}
+
+.caption-provider-info strong {
+  font-size: 12px;
+}
+
+.caption-provider-info p {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.caption-provider-links a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.caption-provider-links a:hover {
+  text-decoration: underline;
+}
+
+.caption-provider-actions {
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.caption-provider-empty {
+  margin: 0;
+}
+
 .guide-section {
   padding: 14px 15px;
   border: 1px solid var(--border);

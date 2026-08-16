@@ -114,6 +114,56 @@ var BILI_SETTINGS = (() => {
   const DEFAULT_PRESET = PRESETS[0];
   const CUSTOM_PRESET_ID = "custom";
 
+  // YouTube 字幕服务商是独立于 AI Provider 的有序回退链。每项只保存服务商和密钥，
+  // 请求地址与鉴权方式由 lib/youtube-api.js 固定，避免用户误把密钥发到错误域名。
+  const YOUTUBE_CAPTION_PROVIDERS = Object.freeze([
+    {
+      id: "supadata",
+      label: "Supadata",
+      origin: "https://api.supadata.ai/",
+      docsUrl: "https://docs.supadata.ai/get-transcript",
+      dashboardUrl: "https://dash.supadata.ai",
+      detail:
+        "只获取 YouTube 现有字幕；没有字幕时会自动尝试列表中的下一项。",
+      detailEn:
+        "Fetches existing YouTube captions only; if unavailable, the next provider is tried.",
+    },
+    {
+      id: "captapi",
+      label: "Captapi",
+      origin: "https://api.captapi.com/",
+      docsUrl: "https://captapi.com/how-to/youtube-transcript",
+      dashboardUrl: "https://captapi.com/dashboard",
+      detail:
+        "返回 YouTube 已发布的带时间戳字幕；没有字幕时会自动尝试列表中的下一项。",
+      detailEn:
+        "Returns published YouTube captions with timestamps; if unavailable, the next provider is tried.",
+    },
+    {
+      id: "transcriptfetch",
+      label: "TranscriptFetch",
+      origin: "https://transcriptfetch.com/",
+      docsUrl: "https://transcriptfetch.com/docs/endpoints",
+      dashboardUrl: "https://transcriptfetch.com/dashboard",
+      detail:
+        "以 captions 模式只读取现有字幕；没有字幕时会自动尝试列表中的下一项。",
+      detailEn:
+        "Uses captions mode to read existing captions only; if unavailable, the next provider is tried.",
+    },
+    {
+      id: "transcriptapi",
+      label: "TranscriptAPI",
+      origin: "https://transcriptapi.com/",
+      docsUrl: "https://transcriptapi.com/docs/api/",
+      dashboardUrl: "https://transcriptapi.com/dashboard/api-keys",
+      detail:
+        "返回 YouTube 字幕及时间戳；服务端支持按语言优先级选择字幕。",
+      detailEn:
+        "Returns YouTube captions with timestamps and supports language-priority selection.",
+    },
+  ]);
+  const MAX_YOUTUBE_CAPTION_PROVIDERS = 8;
+
   // 并发上限压在 8：再高容易撞限流；超时上限 10 分钟是为了照顾本地推理。
   const LIMITS = Object.freeze({
     concurrency: Object.freeze({ min: 1, max: 8, default: 3 }),
@@ -145,7 +195,9 @@ var BILI_SETTINGS = (() => {
     failoverEnabled: false,
     aiConcurrency: LIMITS.concurrency.default,
     aiTimeoutSeconds: LIMITS.timeoutSeconds.default,
-    supadataApiKey: "",
+    youtubeCaptionProviders: Object.freeze([
+      Object.freeze({ providerId: "supadata", apiKey: "" }),
+    ]),
     youtubeEnabled: true,
     bilibiliEnabled: true,
     uiLanguage: "zh-CN",
@@ -166,6 +218,28 @@ var BILI_SETTINGS = (() => {
         return [language, (value || fallback).slice(0, 5000)];
       }),
     );
+  }
+
+  const captionProviderById = (id) =>
+    YOUTUBE_CAPTION_PROVIDERS.find((provider) => provider.id === id) || null;
+
+  function normalizeYoutubeCaptionProviders(input, legacySupadataApiKey = "") {
+    // 有数组即视为用户已明确编辑过列表；即使是空数组也要保留，让用户可以先清空再添加。
+    const source = Array.isArray(input)
+      ? input
+      : [{ providerId: "supadata", apiKey: legacySupadataApiKey }];
+    return source
+      .slice(0, MAX_YOUTUBE_CAPTION_PROVIDERS)
+      .map((item) => {
+        const raw = item && typeof item === "object" ? item : {};
+        const providerId = typeof raw.providerId === "string" ? raw.providerId : "";
+        if (!captionProviderById(providerId)) return null;
+        return {
+          providerId,
+          apiKey: typeof raw.apiKey === "string" ? raw.apiKey.trim().slice(0, 1000) : "",
+        };
+      })
+      .filter(Boolean);
   }
 
   const LANG_CODE_PATTERN = /^[A-Za-z]{2,8}(-[A-Za-z0-9]{2,8})*$/;
@@ -350,10 +424,11 @@ var BILI_SETTINGS = (() => {
       subtitleLangPreference: normalizeLangPreference(
         source.subtitleLangPreference ?? primarySource?.subtitleLangPreference,
       ),
-      supadataApiKey:
-        typeof source.supadataApiKey === "string"
-          ? source.supadataApiKey.trim()
-          : "",
+      // Supadata 单密钥是旧设置格式；首次读取时无感升级为列表的第一项。
+      youtubeCaptionProviders: normalizeYoutubeCaptionProviders(
+        source.youtubeCaptionProviders,
+        source.supadataApiKey,
+      ),
       // 老版本没有适用范围字段；只有显式保存为 false 才关闭，升级后仍默认全开。
       youtubeEnabled: source.youtubeEnabled !== false,
       bilibiliEnabled: source.bilibiliEnabled !== false,
@@ -426,10 +501,13 @@ var BILI_SETTINGS = (() => {
     CUSTOM_PRESET_ID,
     DEFAULTS,
     APP_DEFAULTS,
+    YOUTUBE_CAPTION_PROVIDERS,
+    MAX_YOUTUBE_CAPTION_PROVIDERS,
     DEFAULT_OVERVIEW_PROMPTS,
     LIMITS,
     normalize,
     normalizeAppSettings,
+    normalizeYoutubeCaptionProviders,
     normalizeLangPreference,
     normalizeOverviewPrompts,
     validate,
@@ -440,6 +518,7 @@ var BILI_SETTINGS = (() => {
     isLocalBaseUrl,
     originOf,
     presetById,
+    captionProviderById,
     chatCompletionsUrl,
     modelsUrl,
   };

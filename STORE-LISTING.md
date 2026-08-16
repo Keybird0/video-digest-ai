@@ -11,11 +11,11 @@ Video Digest AI 在 YouTube 与 Bilibili 播放页旁打开侧边栏，把平台
 - 同时配置主 AI 服务和备用 AI 服务；主服务网络错误、超时、限流或服务端故障时自动切换。
 - 设置、密钥、字幕缓存和笔记仅保存在本机，没有开发者服务器、分析、广告或遥测。
 
-YouTube 字幕通过用户自己的 Supadata Key 请求原生字幕；Bilibili 字幕来自平台接口。扩展不下载音频，也不进行语音转写。AI 功能需要用户自备 Provider API Key。
+YouTube 字幕可使用用户配置的 Supadata、Captapi、TranscriptFetch 或 TranscriptAPI，并按用户保存的顺序自动回退；Bilibili 字幕来自平台接口。扩展不在本机下载或转写音频。AI 功能需要用户自备 Provider API Key。
 
 ## 权限说明
 
 - YouTube/Bilibili 播放页：识别当前视频、注入 Digest/笔记按钮并控制时间戳跳转。
-- Bilibili API/CDN 与 Supadata：获取平台可用字幕。
+- Bilibili API/CDN 与用户配置的 YouTube 字幕服务商：获取平台可用字幕。字幕服务商域名仅在用户保存对应配置时按需申请。
 - 标签页：让侧边栏识别当前正在播放的视频。
 - 可选 AI 域名：仅在用户保存 Provider 时按实际域名申请；启用备用服务时一次申请主备两个域名。

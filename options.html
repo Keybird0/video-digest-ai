@@ -49,54 +49,24 @@
         <p class="field-hint scope-save-hint">修改后自动保存，并同步到已打开的视频页。</p>
       </section>
 
-      <section class="card">
-        <h2>字幕服务</h2>
-        <p class="hint">
-          Bilibili 字幕直接读取平台接口；YouTube 原生字幕通过 Supadata 获取，不下载音频，也不做语音转写。
-        </p>
-        <label class="field">
-          <span class="field-label">Supadata API Key</span>
-          <span class="field-row caption-key-row">
-            <input id="supadataApiKey" type="password" autocomplete="off" spellcheck="false" placeholder="用于 YouTube 原生字幕" />
-            <button id="saveSupadataBtn" class="primary-btn" type="button">保存</button>
-          </span>
-          <span class="field-hint">只保存在本机扩展存储，并只发送给 api.supadata.ai。</span>
-          <span id="supadataStatus" class="status field-status" role="status"></span>
-        </label>
-
-        <div class="caption-guide">
-          <section class="guide-section" aria-labelledby="supadataApplyTitle">
-            <div class="guide-title-row">
-              <h3 id="supadataApplyTitle">如何申请 API Key</h3>
-              <a class="guide-link" href="https://dash.supadata.ai" target="_blank" rel="noreferrer">打开 Supadata 控制台 ↗</a>
-            </div>
-            <ol class="guide-list">
-              <li>注册或登录 Supadata；免费档不要求绑定信用卡。</li>
-              <li>进入控制台的 API Keys 页面，创建并复制一个 Key。</li>
-              <li>粘贴到上方输入框，然后点击页面底部的保存按钮。</li>
-            </ol>
-          </section>
-
-          <section class="guide-section quota-section" aria-labelledby="supadataQuotaTitle">
-            <div class="guide-title-row">
-              <h3 id="supadataQuotaTitle">免费额度与使用限制</h3>
-              <span class="checked-date">官方规则 · 2026-08 查询</span>
-            </div>
-            <ul class="guide-list">
-              <li>免费档为每月 100 credits、限速 1 次/秒；没有单独的每日固定次数。</li>
-              <li>本扩展只请求原生字幕：一次成功查询通常消耗 1 credit；字幕不可用的 206 响应也消耗 1 credit。</li>
-              <li>额度不会结转到下月；用完后需等待额度刷新或升级套餐。缓存命中不会重新请求，手动“重新获取字幕”可能再次计费。</li>
-              <li>仅支持公开、已结束且有平台字幕的视频；私密、登录/年龄/地区受限视频和直播可能无法获取。</li>
-            </ul>
-            <p class="official-note">
-              套餐、额度和计费规则可能调整，请以
-              <a href="https://supadata.ai/pricing" target="_blank" rel="noreferrer">官方定价页</a>
-              与
-              <a href="https://docs.supadata.ai/get-transcript" target="_blank" rel="noreferrer">字幕 API 文档</a>
-              的实时说明为准。
+      <section class="card caption-services-card">
+        <div class="section-heading-row">
+          <div>
+            <h2>YouTube 字幕服务</h2>
+            <p class="hint">
+              Bilibili 字幕直接读取平台接口。YouTube 可配置多个字幕服务商，按从上到下的顺序尝试；上一项失败后才会请求下一项。
             </p>
-          </section>
+          </div>
+          <button id="addCaptionProviderBtn" class="ghost-btn" type="button">添加字幕服务商</button>
         </div>
+        <div id="captionProviderList" class="caption-provider-list"></div>
+        <div class="actions caption-provider-actions">
+          <button id="saveCaptionProvidersBtn" class="primary-btn" type="button">保存字幕服务商</button>
+          <span id="captionProvidersStatus" class="status" role="status"></span>
+        </div>
+        <p class="field-hint">
+          API Key 仅保存在本机扩展存储，且只会发送给对应服务商。保存时 Chrome 会请求已配置服务商的域名访问权限。
+        </p>
       </section>
 
       <section class="card provider-manager">

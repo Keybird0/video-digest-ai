@@ -117,13 +117,21 @@ test("HTML 引用的脚本与样式都存在", () => {
   }
 });
 
-test("字幕服务提供独立保存入口", () => {
+test("字幕服务商支持多项配置、排序回退与独立保存", () => {
   const html = readText("options.html");
   const script = readText("options.js");
-  assert.match(html, /id="saveSupadataBtn"/);
-  assert.match(html, /id="supadataStatus"/);
-  assert.match(script, /saveSupadataKey/);
-  assert.match(script, /字幕服务密钥已保存/);
+  const settings = readText("settings.js");
+  const background = readText("background.js");
+  assert.match(html, /id="addCaptionProviderBtn"/);
+  assert.match(html, /id="saveCaptionProvidersBtn"/);
+  assert.match(html, /id="captionProviderList"/);
+  assert.match(script, /renderCaptionProviders/);
+  assert.match(script, /moveCaptionProvider/);
+  assert.match(script, /saveCaptionProviders/);
+  assert.match(settings, /captapi/);
+  assert.match(settings, /transcriptfetch/);
+  assert.match(settings, /transcriptapi/);
+  assert.match(background, /fetchTranscriptWithFallback/);
 });
 
 test("模型配置保存按钮使用明确文案", () => {

@@ -9,9 +9,9 @@
 
 ## 支持范围
 
-- YouTube：标准 `youtube.com/watch` 页面；通过 Supadata 的 `mode=native` 获取原生字幕。
+- YouTube：标准 `youtube.com/watch` 页面；支持 Supadata、Captapi、TranscriptFetch 和 TranscriptAPI。可配置多个服务商，按设置页从上到下的顺序回退。
 - Bilibili：普通视频、合集和分P；通过 Bilibili 官方接口与 WBI 签名读取当前登录会话可见的字幕。
-- 不支持 Shorts、直播、番剧影视页、受限视频和没有平台字幕的视频；不会下载音频或进行语音转写。
+- 不支持 Shorts、直播、番剧影视页和受限视频。四个 YouTube 字幕服务都只读取已发布字幕；没有可用字幕时会按顺序继续尝试下一项。
 
 ## 功能
 
@@ -42,13 +42,16 @@
 
 内置常见服务商预设，包括 DeepSeek、OpenAI、Claude、Gemini、Kimi、GLM、通义千问、火山方舟 Agent Plan、SiliconFlow、OpenRouter 和 Ollama；也支持 OpenAI 兼容接口、Anthropic 原生协议和自定义服务。火山方舟预设使用 Agent Plan 专用的 `/api/plan/v3`，普通按量 API 或 Coding Plan 可通过“自定义”填写各自的 Base URL。远程地址必须使用 HTTPS；HTTP 只允许 localhost 与 127.0.0.1。
 
-## Supadata API Key 与额度
+## YouTube 字幕服务商
 
-YouTube 原生字幕需要用户自己的 Supadata API Key。打开 [Supadata 控制台](https://dash.supadata.ai) 注册或登录，在 API Keys 页面创建 Key，再粘贴到扩展设置页即可。
+设置页默认提供一个 Supadata 项，可通过“添加字幕服务商”继续添加 Captapi、TranscriptFetch 或 TranscriptAPI。填写各自的 API Key 后，可用“上移 / 下移”调整顺序；请求按从上到下的顺序执行，只有前一项失败才尝试后一项。密钥仅保存在 `chrome.storage.local`，并且仅发送至所属服务商域名。
 
-截至 2026 年 8 月，Supadata 官方定价页列出的免费档为每月 100 credits、限速 1 次/秒，没有单独的每日固定次数。本扩展固定使用 `mode=native`：一次原生字幕查询通常消耗 1 credit，字幕不可用的 HTTP 206 响应也会消耗 1 credit。额度不会结转到下月，用完后需要等待刷新或升级套餐。
+- [Supadata](https://docs.supadata.ai/get-transcript)：扩展固定使用 `mode=native`，只取已有字幕。
+- [Captapi](https://captapi.com/how-to/youtube-transcript)：返回 YouTube 已发布的带时间戳字幕。
+- [TranscriptFetch](https://transcriptfetch.com/docs/endpoints)：扩展固定使用 `captions` 模式，只取已有字幕。
+- [TranscriptAPI](https://transcriptapi.com/docs/api/)：返回带时间戳的 YouTube 字幕，并支持服务端语言优先级。
 
-扩展会缓存已获取的字幕；缓存命中不会重新请求，手动“重新获取字幕”可能再次消耗额度。套餐和计费规则可能调整，请以 [官方定价页](https://supadata.ai/pricing) 与 [字幕 API 文档](https://docs.supadata.ai/get-transcript) 的实时说明为准。
+扩展会缓存已获取的字幕；缓存命中不会重新请求，手动“重新获取字幕”可能再次消耗服务商额度。套餐、额度和计费规则会变化，请以设置页每个服务商提供的官方文档和控制台说明为准。
 
 ## 本地安装
 
@@ -58,7 +61,7 @@ YouTube 原生字幕需要用户自己的 Supadata API Key。打开 [Supadata �
 2. 运行 `npm run package`，得到 `dist/video-digest-ai-<version>.zip`。
 3. 解压 ZIP，打开 `chrome://extensions`。
 4. 开启开发者模式，选择“加载已解压的扩展程序”，选中解压目录。
-5. 在自动打开的设置页填写 Supadata Key、主 Provider，并按需启用备用 Provider 或调整“适用范围”。
+5. 在自动打开的设置页配置至少一个 YouTube 字幕服务商、主 Provider，并按需启用备用 Provider 或调整“适用范围”。
 
 所有密钥只写入 `chrome.storage.local`。扩展没有后端、账户、分析、广告或遥测。
 
