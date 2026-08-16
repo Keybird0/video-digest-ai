@@ -28,7 +28,7 @@ const AI_MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 // 加码重试的天花板。再往上多数模型会因超过自身输出上限直接拒绝请求。
 const MAX_OUTPUT_TOKENS = 32_768;
 const NOTES_STORAGE_KEY = "video_digest_notes";
-const MAX_NOTES = 100;
+const NOTE_STORAGE_SAFE_BYTES = 7 * 1024 * 1024;
 
 // 内容脚本运行在 B 站页面上下文，不应读到密钥或缓存。
 chrome.storage.local
@@ -264,14 +264,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message?.action === "getNotes") {
-    handleGetNotes(message.bvid, message.site, message.scope)
+    handleGetNotes(message.bvid, message.site, message.scope, {
+      offset: message.offset,
+      limit: message.limit,
+    })
       .then(sendResponse)
       .catch((error) => sendResponse({ success: false, error: error.message }));
     return true;
   }
 
   if (message?.action === "getMemos") {
-    handleGetMemos(message.kind)
+    handleGetMemos(message.kind, { offset: message.offset, limit: message.limit })
       .then(sendResponse)
       .catch((error) => sendResponse({ success: false, error: error.message }));
     return true;
@@ -286,6 +289,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message?.action === "updateNote") {
     handleUpdateNote(message.noteId, message.text)
+      .then(sendResponse)
+      .catch((error) => sendResponse({ success: false, error: error.message }));
+    return true;
+  }
+
+  if (message?.action === "getNoteStats") {
+    handleGetNoteStats()
+      .then(sendResponse)
+      .catch((error) => sendResponse({ success: false, error: error.message }));
+    return true;
+  }
+
+  if (message?.action === "applyNoteLimit") {
+    enforceStoredNoteLimits()
       .then(sendResponse)
       .catch((error) => sendResponse({ success: false, error: error.message }));
     return true;
@@ -1339,13 +1356,91 @@ async function readNotes() {
     : [];
 }
 
-function mutateNotes(mutate) {
+function jsonByteLength(value) {
+  const source = JSON.stringify(value);
+  if (typeof TextEncoder !== "undefined") return new TextEncoder().encode(source).byteLength;
+  return source.length;
+}
+
+function pageNotes(notes, { offset, limit } = {}) {
+  const totalCount = notes.length;
+  // 未传分页参数的旧调用方仍按原行为取得全部数据。
+  if (!Number.isFinite(Number(limit))) {
+    return { notes, totalCount, hasMore: false };
+  }
+  const start = Math.max(0, Math.floor(Number(offset) || 0));
+  const size = Math.min(100, Math.max(1, Math.floor(Number(limit) || 100)));
+  const page = notes.slice(start, start + size);
+  return { notes: page, totalCount, hasMore: start + page.length < totalCount };
+}
+
+async function capNotesForStorage(notes, { noteLimit, protectedNoteId } = {}) {
+  const capped = notes.slice(0, noteLimit);
+  const removed = notes.slice(noteLimit);
+  const [allBytes, currentNotesBytes] = await Promise.all([
+    chrome.storage.local.getBytesInUse(null),
+    chrome.storage.local.getBytesInUse(NOTES_STORAGE_KEY),
+  ]);
+  const nonNoteBytes = Math.max(0, Number(allBytes) - Number(currentNotesBytes));
+  // 缓存等非笔记内容已超过安全线时，不为了保存一条笔记而清空原有笔记。
+  if (nonNoteBytes >= NOTE_STORAGE_SAFE_BYTES) {
+    return { notes: capped, removed, storageBlocked: true };
+  }
+  while (
+    capped.length &&
+    nonNoteBytes + jsonByteLength({ [NOTES_STORAGE_KEY]: capped }) > NOTE_STORAGE_SAFE_BYTES
+  ) {
+    const oldest = capped.at(-1);
+    // 正在保存/编辑的条目不得被悄悄裁掉，直接反馈容量不足。
+    if (oldest?.id === protectedNoteId) {
+      return { notes: capped, removed, storageBlocked: true };
+    }
+    removed.push(capped.pop());
+  }
+  return { notes: capped, removed, storageBlocked: false };
+}
+
+function mutateNotes(mutate, { protectedNoteId } = {}) {
   return notesWriteQueue(async () => {
     const notes = await readNotes();
     const next = mutate(notes);
-    await chrome.storage.local.set({ [NOTES_STORAGE_KEY]: next });
-    return next;
+    const settings = await getSettings();
+    const result = await capNotesForStorage(next, {
+      noteLimit: settings.noteLimit,
+      protectedNoteId,
+    });
+    if (result.storageBlocked && protectedNoteId) {
+      throw new Error("笔记存储已达到 7 MB 安全线，请导出或删除部分笔记后再保存。");
+    }
+    await chrome.storage.local.set({ [NOTES_STORAGE_KEY]: result.notes });
+    return result;
   });
+}
+
+async function enforceStoredNoteLimits() {
+  const result = await mutateNotes((notes) => notes);
+  return {
+    success: true,
+    removedCount: result.removed.length,
+    storageBlocked: result.storageBlocked,
+  };
+}
+
+async function handleGetNoteStats() {
+  const [notes, settings, notesBytes, totalBytes] = await Promise.all([
+    readNotes(),
+    getSettings(),
+    chrome.storage.local.getBytesInUse(NOTES_STORAGE_KEY),
+    chrome.storage.local.getBytesInUse(null),
+  ]);
+  return {
+    success: true,
+    totalCount: notes.length,
+    noteLimit: settings.noteLimit,
+    notesBytes,
+    totalBytes,
+    safeBytes: NOTE_STORAGE_SAFE_BYTES,
+  };
 }
 
 // 请模型把口语字幕整理成通顺的笔记。失败返回 null，笔记保持原始字幕。
@@ -1387,12 +1482,14 @@ async function polishNoteText(context, videoTitle) {
 // 后台润色完成后把正文换掉。笔记可能已被删除，map 不命中就什么都不做。
 async function polishNoteWhenReady(noteId, context, videoTitle) {
   const polished = await polishNoteText(context, videoTitle);
-  await mutateNotes((notes) =>
-    notes.map((note) =>
-      note.id === noteId && note.pending
-        ? { ...note, text: polished || note.text, pending: false }
-        : note,
-    ),
+  await mutateNotes(
+    (notes) =>
+      notes.map((note) =>
+        note.id === noteId && note.pending
+          ? { ...note, text: polished || note.text, pending: false }
+          : note,
+      ),
+    { protectedNoteId: noteId },
   );
   chrome.runtime.sendMessage({ action: "noteUpdated", noteId }).catch(() => {});
 }
@@ -1455,11 +1552,10 @@ async function handleSaveNote({
     createdAt: Date.now(),
   };
 
-  await mutateNotes((notes) => {
+  const mutation = await mutateNotes((notes) => {
     notes.unshift(note);
-    if (notes.length > MAX_NOTES) notes.splice(MAX_NOTES);
     return notes;
-  });
+  }, { protectedNoteId: note.id });
 
   // 侧边栏可能开着笔记页，通知它刷新。
   chrome.runtime.sendMessage({ action: "noteSaved", note }).catch(() => {});
@@ -1467,32 +1563,31 @@ async function handleSaveNote({
   // 故意不 await：让播放页的按钮立刻得到「已保存」。
   if (polishContext) polishNoteWhenReady(note.id, polishContext, videoTitle);
 
-  return { success: true, note };
+  return { success: true, note, removedCount: mutation.removed.length };
 }
 
-async function handleGetNotes(videoIdInput, site = "bilibili", scope = "video") {
+async function handleGetNotes(videoIdInput, site = "bilibili", scope = "video", page) {
   const notes = await readNotes();
   if (scope === "all") {
     return {
       success: true,
-      notes,
-      totalCount: notes.length,
+      ...pageNotes(notes, page),
     };
   }
   const regularNotes = notes.filter(
     (note) => !["memo", "ai_note", "ai_chat"].includes(note.kind),
   );
   const resource = videoIdInput ? resolveVideo(site, videoIdInput) : null;
+  const selectedNotes = resource
+    ? regularNotes.filter(
+        (note) =>
+          (note.site || "bilibili") === resource.site &&
+          note.bvid === resource.videoId,
+      )
+    : regularNotes;
   return {
     success: true,
-    notes: resource
-      ? regularNotes.filter(
-          (note) =>
-            (note.site || "bilibili") === resource.site &&
-            note.bvid === resource.videoId,
-        )
-      : regularNotes,
-    totalCount: regularNotes.length,
+    ...pageNotes(selectedNotes, page),
   };
 }
 
@@ -1531,23 +1626,22 @@ async function handleSaveMemo({
     });
   }
 
-  await mutateNotes((notes) => {
+  const mutation = await mutateNotes((notes) => {
     notes.unshift(memo);
-    if (notes.length > MAX_NOTES) notes.splice(MAX_NOTES);
     return notes;
-  });
+  }, { protectedNoteId: memo.id });
   chrome.runtime.sendMessage({ action: "noteSaved", note: memo }).catch(() => {});
-  return { success: true, memo };
+  return { success: true, memo, removedCount: mutation.removed.length };
 }
 
-async function handleGetMemos(kind) {
+async function handleGetMemos(kind, page) {
   const notes = await readNotes();
   const memos = notes.filter((note) =>
     kind === "ai_note"
       ? note.kind === "ai_note" || note.kind === "ai_chat"
       : note.kind === "memo",
   );
-  return { success: true, notes: memos, totalCount: memos.length };
+  return { success: true, ...pageNotes(memos, page) };
 }
 
 async function handleDeleteNote(noteId) {
@@ -1568,6 +1662,7 @@ async function handleUpdateNote(noteId, text) {
       // 手动修改应胜过尚未完成的 AI 润色，避免后台结果把用户编辑覆盖掉。
       return { ...note, text: nextText, pending: false, updatedAt: Date.now() };
     }),
+    { protectedNoteId: noteId },
   );
   if (!found) return { success: false, error: "NOTE_NOT_FOUND", message: "笔记不存在。" };
   chrome.runtime.sendMessage({ action: "noteUpdated", noteId }).catch(() => {});

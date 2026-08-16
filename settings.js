@@ -169,6 +169,9 @@ var BILI_SETTINGS = (() => {
   const LIMITS = Object.freeze({
     concurrency: Object.freeze({ min: 1, max: 8, default: 3 }),
     timeoutSeconds: Object.freeze({ min: 30, max: 600, default: 120 }),
+    // 笔记正文长度差异很大，条目数只是保留策略；实际写入还会由 background
+    // 的 7 MB 安全线兜底，避免挤满 chrome.storage.local。
+    noteLimit: Object.freeze({ min: 1, max: 400, default: 100 }),
   });
 
   const DEFAULTS = Object.freeze({
@@ -203,6 +206,7 @@ var BILI_SETTINGS = (() => {
     ]),
     youtubeEnabled: true,
     bilibiliEnabled: true,
+    noteLimit: LIMITS.noteLimit.default,
     uiLanguage: "zh-CN",
   });
 
@@ -478,6 +482,7 @@ var BILI_SETTINGS = (() => {
       // 老版本没有适用范围字段；只有显式保存为 false 才关闭，升级后仍默认全开。
       youtubeEnabled: source.youtubeEnabled !== false,
       bilibiliEnabled: source.bilibiliEnabled !== false,
+      noteLimit: clampNumber(source.noteLimit, LIMITS.noteLimit),
       uiLanguage: source.uiLanguage === "en" ? "en" : "zh-CN",
       overviewPrompts: normalizeOverviewPrompts(source.overviewPrompts),
     };

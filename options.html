@@ -60,6 +60,20 @@
         </ul>
       </section>
 
+      <section class="card note-storage-card">
+        <h2>笔记存储</h2>
+        <label class="field compact-field" for="noteLimit">
+          <span class="field-label">最多保留笔记条目</span>
+          <input id="noteLimit" type="number" min="1" max="400" step="1" />
+          <span class="field-hint">默认 100 条，最多 400 条。达到条目上限时，保存新笔记会清理最早的笔记。</span>
+        </label>
+        <p class="field-hint note-storage-impact">笔记、字幕缓存和设置共用本机扩展存储。笔记写入使用 7 MB 安全线；空间不足时不会写入新笔记。超过 100 条时，侧边栏按每页 100 条加载，导出仍包含当前范围的全部笔记。降低上限会删除超出部分最早的笔记，请先导出备份。</p>
+        <div class="actions">
+          <button id="saveNoteSettingsBtn" class="primary-btn" type="button">保存笔记设置</button>
+          <span id="noteSettingsStatus" class="status" role="status"></span>
+        </div>
+      </section>
+
       <section class="card caption-services-card">
         <div class="section-heading-row">
           <div>

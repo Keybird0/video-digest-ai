@@ -19,6 +19,14 @@ const EN_TEXT = Object.freeze({
   "“AI 记”：在“问 AI”中将任意回答保存为笔记。": "AI Notes: save any answer from Ask AI as a note.",
   "字幕页按": "On the Transcript tab, press",
   "：快速搜索字幕；所有已保存笔记都可随时再次编辑。": ": search captions quickly. Every saved note can be edited later.",
+  "笔记存储": "Note storage",
+  "最多保留笔记条目": "Maximum saved notes",
+  "默认 100 条，最多 400 条。达到条目上限时，保存新笔记会清理最早的笔记。": "Default: 100 notes; maximum: 400. When the limit is reached, saving a new note removes the oldest one.",
+  "笔记、字幕缓存和设置共用本机扩展存储。笔记写入使用 7 MB 安全线；空间不足时不会写入新笔记。超过 100 条时，侧边栏按每页 100 条加载，导出仍包含当前范围的全部笔记。降低上限会删除超出部分最早的笔记，请先导出备份。": "Notes, caption caches, and settings share local extension storage. Notes use a 7 MB safety line; new notes are not saved when space is insufficient. Above 100 notes, the side panel loads 100 notes per page, while exports still include the whole current scope. Lowering the limit removes the oldest excess notes, so export a backup first.",
+  "保存笔记设置": "Save note settings",
+  "笔记设置已保存": "Note settings saved",
+  "保存后已清理最早的": "After saving, removed the oldest",
+  "条笔记。": "notes.",
   "YouTube 字幕服务": "YouTube caption services",
   "Bilibili 字幕直接读取平台接口。YouTube 可配置多个字幕服务商，按从上到下的顺序尝试；上一项失败后才会请求下一项。可直接拖动卡片调整顺序。": "Bilibili captions are read from the platform API. Configure multiple YouTube caption providers; they are tried from top to bottom, and the next provider is requested only after the previous one fails. Drag cards to reorder them.",
   "添加字幕服务商": "Add caption provider",
@@ -114,6 +122,7 @@ function translateText(text) {
         [/^拉取失败：/, "Fetch failed: "],
         [/^测试失败：/, "Test failed: "],
         [/^保存失败：/, "Save failed: "],
+        [/^保存后已清理最早的 (\d+) 条笔记。$/, "After saving, removed the oldest $1 notes."],
         [/^备用服务：/, "Backup: "],
       ]
     : [
@@ -122,6 +131,7 @@ function translateText(text) {
         [/^Fetch failed: /, "拉取失败："],
         [/^Test failed: /, "测试失败："],
         [/^Save failed: /, "保存失败："],
+        [/^After saving, removed the oldest (\d+) notes\.$/, "保存后已清理最早的 $1 条笔记。"],
         [/^Backup: /, "备用服务："],
       ];
   return replacements.reduce((result, [pattern, replacement]) => result.replace(pattern, replacement), value);
@@ -179,12 +189,15 @@ const captionProvidersStatus = document.getElementById("captionProvidersStatus")
 const aiProviderList = document.getElementById("aiProviderList");
 const aiConcurrency = document.getElementById("aiConcurrency");
 const aiTimeoutSeconds = document.getElementById("aiTimeoutSeconds");
+const noteLimit = document.getElementById("noteLimit");
+const noteSettingsStatus = document.getElementById("noteSettingsStatus");
 let uiLanguage = "zh-CN";
 let overviewPrompts = BILI_SETTINGS.normalizeOverviewPrompts();
 let youtubeCaptionProviders = BILI_SETTINGS.normalizeYoutubeCaptionProviders();
 let aiProviders = BILI_SETTINGS.normalizeAiProviders();
 let draggedAiProviderId = "";
 let draggedCaptionProviderIndex = -1;
+let savedNoteLimit = BILI_SETTINGS.LIMITS.noteLimit.default;
 
 const statusTimers = new WeakMap();
 
@@ -669,9 +682,52 @@ function currentAppSettings() {
     youtubeCaptionProviders: readCaptionProviders(),
     youtubeEnabled: youtubeEnabled.checked,
     bilibiliEnabled: bilibiliEnabled.checked,
+    noteLimit: savedNoteLimit,
     uiLanguage,
     overviewPrompts,
   });
+}
+
+async function saveNoteSettings() {
+  const normalizedLimit = BILI_SETTINGS.normalizeAppSettings({
+    noteLimit: noteLimit.value,
+  }).noteLimit;
+  noteLimit.disabled = true;
+  try {
+    const stats = await chromeApi.runtime?.sendMessage?.({ action: "getNoteStats" });
+    if (
+      Number(stats?.totalCount) > normalizedLimit &&
+      typeof globalThis.confirm === "function"
+    ) {
+      const warning =
+        uiLanguage === "en"
+          ? `Lowering the limit to ${normalizedLimit} will permanently remove ${stats.totalCount - normalizedLimit} oldest notes. Continue?`
+          : `将上限降至 ${normalizedLimit} 条会永久删除最早的 ${stats.totalCount - normalizedLimit} 条笔记，是否继续？`;
+      if (!globalThis.confirm(warning)) return;
+    }
+    const stored = await chromeApi.storage.local.get([
+      storageKey,
+      BILI_SETTINGS.LEGACY_STORAGE_KEY,
+    ]);
+    const current = BILI_SETTINGS.normalizeAppSettings(
+      stored[storageKey] ?? stored[BILI_SETTINGS.LEGACY_STORAGE_KEY],
+    );
+    const next = BILI_SETTINGS.normalizeAppSettings({ ...current, noteLimit: normalizedLimit });
+    await chromeApi.storage.local.set({ [storageKey]: next });
+    savedNoteLimit = next.noteLimit;
+    noteLimit.value = savedNoteLimit;
+    const result = await chromeApi.runtime?.sendMessage?.({ action: "applyNoteLimit" });
+    const removedCount = Number(result?.removedCount) || 0;
+    showStatus(
+      noteSettingsStatus,
+      removedCount ? `保存后已清理最早的 ${removedCount} 条笔记。` : "笔记设置已保存",
+      { sticky: removedCount > 0 },
+    );
+  } catch (error) {
+    showStatus(noteSettingsStatus, `保存失败：${error.message}`, { sticky: true, error: true });
+  } finally {
+    noteLimit.disabled = false;
+  }
 }
 
 async function notifySiteScopeChanged(settings) {
@@ -1106,6 +1162,8 @@ async function load() {
   aiProviders = settings.aiProviders;
   aiConcurrency.value = settings.aiConcurrency;
   aiTimeoutSeconds.value = settings.aiTimeoutSeconds;
+  savedNoteLimit = settings.noteLimit;
+  noteLimit.value = savedNoteLimit;
   youtubeCaptionProviders = settings.youtubeCaptionProviders;
   youtubeEnabled.checked = settings.youtubeEnabled;
   bilibiliEnabled.checked = settings.bilibiliEnabled;
@@ -1125,6 +1183,7 @@ document
   .getElementById("saveCaptionProvidersBtn")
   .addEventListener("click", saveCaptionProviders);
 document.getElementById("saveBtn").addEventListener("click", save);
+document.getElementById("saveNoteSettingsBtn").addEventListener("click", saveNoteSettings);
 for (const button of document.querySelectorAll("[data-language]")) {
   button.addEventListener("click", async () => {
     uiLanguage = button.dataset.language;

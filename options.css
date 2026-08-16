@@ -691,6 +691,14 @@ code {
   border-radius: 4px;
 }
 
+.note-storage-card .field {
+  max-width: 360px;
+}
+
+.note-storage-impact {
+  max-width: 820px;
+}
+
 .actions {
   display: flex;
   align-items: center;

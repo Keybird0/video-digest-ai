@@ -548,3 +548,10 @@ test("AI 服务列表保留顺序、稳定 id，并要求至少配置一项", ()
   assert.equal(empty.ok, false);
   assert.match(empty.errors.join(" "), /至少添加一个 AI 服务/);
 });
+
+test("笔记条目上限默认 100，允许配置至 400", () => {
+  assert.equal(settings.normalizeAppSettings({}).noteLimit, 100);
+  assert.equal(settings.normalizeAppSettings({ noteLimit: 400 }).noteLimit, 400);
+  assert.equal(settings.normalizeAppSettings({ noteLimit: 999 }).noteLimit, 400);
+  assert.equal(settings.normalizeAppSettings({ noteLimit: 0 }).noteLimit, 1);
+});

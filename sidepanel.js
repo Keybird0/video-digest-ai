@@ -137,6 +137,9 @@ const SIDE_PANEL_EN = Object.freeze({
   "导出为 JSON": "Export as JSON",
   "导出为 Markdown": "Export as Markdown",
   "导出为 CSV": "Export as CSV",
+  "加载更多": "Load more",
+  "已显示": "Showing",
+  "共": "of",
   "访问锚点": "Open timestamp",
   "已保存，并记录当前视频访问锚点。":
     "Saved with the current video timestamp.",
@@ -166,6 +169,7 @@ function uiText(text) {
           [/^(\d+) 金句$/, "$1 key quotes"],
           [/^(\d+) 条$/, "$1 items"],
           [/^(\d+) 条命中$/, "$1 matches"],
+          [/^已显示 (\d+) \/ 共 (\d+) 条$/, "Showing $1 of $2"],
           [/^(\d+) 块失败，结果不完整$/, "$1 chunks failed; result incomplete"],
           [/^已保存$/, "Saved"],
         ]
@@ -175,6 +179,7 @@ function uiText(text) {
           [/^(\d+) key quotes$/, "$1 金句"],
           [/^(\d+) items$/, "$1 条"],
           [/^(\d+) matches$/, "$1 条命中"],
+          [/^Showing (\d+) of (\d+)$/, "已显示 $1 / 共 $2 条"],
           [/^(\d+) chunks failed; result incomplete$/, "$1 块失败，结果不完整"],
           [/^Saved$/, "已保存"],
         ];
@@ -236,6 +241,9 @@ const state = {
   chatMessages: [], // 当前视频的多轮问答，仅在本次侧栏会话中保留
   chatSending: false,
   notesForExport: [],
+  notesLoaded: [],
+  notesTotalCount: 0,
+  notesHasMore: false,
   overviewPrompts: { ...BILI_SETTINGS.DEFAULT_OVERVIEW_PROMPTS },
   // 提示词的编辑语言可独立于侧栏界面语言；例如中文界面也能直接维护英文模板。
   overviewPromptLanguage: "zh-CN",
@@ -1437,59 +1445,73 @@ function renderAnalysis(analysis, fromCache, { failedChunks = 0 } = {}) {
 // 笔记
 // ============================================================
 
-async function loadNotes() {
+const NOTES_PAGE_SIZE = 100;
+
+async function loadNotes({ append = false } = {}) {
+  const offset = append ? state.notesLoaded.length : 0;
+  if (!append) {
+    state.notesLoaded = [];
+    state.notesTotalCount = 0;
+    state.notesHasMore = false;
+  }
   state.notesForExport = [];
   setNotesExportButtonsDisabled(true);
+  const pagination = { offset, limit: NOTES_PAGE_SIZE };
+  let result;
   if (state.notesScope === "ai") {
     el("notesEntries").hidden = true;
     el("memoPanel").hidden = true;
     el("aiNotesPanel").hidden = false;
-    const result = await chrome.runtime.sendMessage({
+    result = await chrome.runtime.sendMessage({
       action: "getMemos",
       kind: "ai_note",
+      ...pagination,
     });
-    state.notesForExport = result?.notes || [];
-    renderAiNotes(state.notesForExport);
-    return;
-  }
-  if (state.notesScope === "memo") {
+  } else if (state.notesScope === "memo") {
     el("notesEntries").hidden = true;
     el("memoPanel").hidden = false;
     el("aiNotesPanel").hidden = true;
-    const result = await chrome.runtime.sendMessage({
+    result = await chrome.runtime.sendMessage({
       action: "getMemos",
       kind: "memo",
+      ...pagination,
     });
-    state.notesForExport = result?.notes || [];
-    renderMemos(state.notesForExport);
-    return;
+  } else {
+    el("notesEntries").hidden = false;
+    el("memoPanel").hidden = true;
+    el("aiNotesPanel").hidden = true;
+    result = await chrome.runtime.sendMessage({
+      action: "getNotes",
+      site: state.site,
+      bvid: state.notesScope === "video" ? state.bvid : null,
+      scope: state.notesScope,
+      ...pagination,
+    });
   }
-  el("notesEntries").hidden = false;
-  el("memoPanel").hidden = true;
-  el("aiNotesPanel").hidden = true;
-  const result = await chrome.runtime.sendMessage({
-    action: "getNotes",
-    site: state.site,
-    bvid: state.notesScope === "video" ? state.bvid : null,
-    scope: state.notesScope,
-  });
-  state.notesForExport = result?.notes || [];
-  renderNotes(state.notesForExport);
+
+  const page = result?.notes || [];
+  state.notesLoaded = append ? [...state.notesLoaded, ...page] : page;
+  state.notesTotalCount = Number(result?.totalCount) || 0;
+  state.notesHasMore = Boolean(result?.hasMore);
+  if (state.notesScope === "ai") renderAiNotes(state.notesLoaded, state.notesTotalCount);
+  else if (state.notesScope === "memo") renderMemos(state.notesLoaded, state.notesTotalCount);
+  else renderNotes(state.notesLoaded, state.notesTotalCount);
+  updateNotesPagination();
 }
 
-function renderMemos(memos) {
-  el("notesCount").textContent = memos.length ? uiText(`${memos.length} 条`) : "";
-  setNotesExportButtonsDisabled(memos.length === 0);
-  el("memoEmpty").hidden = memos.length > 0;
+function renderMemos(memos, totalCount = memos.length) {
+  el("notesCount").textContent = totalCount ? uiText(`${totalCount} 条`) : "";
+  setNotesExportButtonsDisabled(totalCount === 0);
+  el("memoEmpty").hidden = totalCount > 0;
   const list = el("memoList");
   list.textContent = "";
   for (const memo of memos) list.appendChild(renderMemoCard(memo));
 }
 
-function renderAiNotes(notes) {
-  el("notesCount").textContent = notes.length ? uiText(`${notes.length} 条`) : "";
-  setNotesExportButtonsDisabled(notes.length === 0);
-  el("aiNotesEmpty").hidden = notes.length > 0;
+function renderAiNotes(notes, totalCount = notes.length) {
+  el("notesCount").textContent = totalCount ? uiText(`${totalCount} 条`) : "";
+  setNotesExportButtonsDisabled(totalCount === 0);
+  el("aiNotesEmpty").hidden = totalCount > 0;
   const list = el("aiNotesList");
   list.textContent = "";
   for (const note of notes) list.appendChild(renderMemoCard(note, { ai: true }));
@@ -1537,10 +1559,10 @@ function flashActionButton(button, message) {
   }, 1500);
 }
 
-function renderNotes(notes) {
-  el("notesCount").textContent = notes.length ? uiText(`${notes.length} 条`) : "";
-  setNotesExportButtonsDisabled(notes.length === 0);
-  el("notesEmpty").hidden = notes.length > 0;
+function renderNotes(notes, totalCount = notes.length) {
+  el("notesCount").textContent = totalCount ? uiText(`${totalCount} 条`) : "";
+  setNotesExportButtonsDisabled(totalCount === 0);
+  el("notesEmpty").hidden = totalCount > 0;
   // 「本视频」下空着，多半只是这个视频没记过，别让人以为笔记全丢了。
   el("notesEmptyTitle").textContent = uiText(
     state.notesScope === "video" ? "这个视频还没有笔记" : "还没有任何笔记",
@@ -1549,6 +1571,24 @@ function renderNotes(notes) {
   const list = el("notesList");
   list.textContent = "";
   for (const note of notes) list.appendChild(renderAnyNote(note));
+}
+
+function updateNotesPagination() {
+  const button = el("loadMoreNotesBtn");
+  if (!button) return;
+  button.hidden = !state.notesHasMore;
+  button.disabled = false;
+  if (state.notesHasMore) {
+    button.textContent = uiText("加载更多");
+    button.title = uiText(`已显示 ${state.notesLoaded.length} / 共 ${state.notesTotalCount} 条`);
+  }
+}
+
+async function loadMoreNotes() {
+  if (!state.notesHasMore) return;
+  const button = el("loadMoreNotesBtn");
+  button.disabled = true;
+  await loadNotes({ append: true });
 }
 
 function setNotesExportButtonsDisabled(disabled) {
@@ -1664,8 +1704,26 @@ function downloadNotesFile(content, extension, mimeType) {
   URL.revokeObjectURL(url);
 }
 
-function exportNotes(format) {
-  const notes = Array.isArray(state.notesForExport) ? state.notesForExport : [];
+async function notesForCurrentScope() {
+  if (state.notesScope === "ai") {
+    const result = await chrome.runtime.sendMessage({ action: "getMemos", kind: "ai_note" });
+    return result?.notes || [];
+  }
+  if (state.notesScope === "memo") {
+    const result = await chrome.runtime.sendMessage({ action: "getMemos", kind: "memo" });
+    return result?.notes || [];
+  }
+  const result = await chrome.runtime.sendMessage({
+    action: "getNotes",
+    site: state.site,
+    bvid: state.notesScope === "video" ? state.bvid : null,
+    scope: state.notesScope,
+  });
+  return result?.notes || [];
+}
+
+async function exportNotes(format) {
+  const notes = await notesForCurrentScope();
   if (!notes.length) return;
   if (format === "json") {
     downloadNotesFile(
@@ -2285,6 +2343,7 @@ function setupEventListeners() {
   el("notesScopeAll").addEventListener("click", () => setNotesScope("all"));
   el("notesScopeMemo").addEventListener("click", () => setNotesScope("memo"));
   el("notesScopeAi").addEventListener("click", () => setNotesScope("ai"));
+  el("loadMoreNotesBtn").addEventListener("click", loadMoreNotes);
   el("exportNotesJsonBtn").addEventListener("click", () => exportNotes("json"));
   el("exportNotesMarkdownBtn").addEventListener("click", () =>
     exportNotes("markdown"),

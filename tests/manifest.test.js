@@ -334,7 +334,21 @@ test("笔记范围按本视频、手记、AI 记、全部排列，全部视图�
   assert.match(sidepanel, /scope:\s*state\.notesScope/);
   assert.match(sidepanel, /function renderAnyNote\(note\)/);
   assert.match(background, /if \(scope === "all"\)/);
-  assert.match(background, /notes,\s*totalCount: notes\.length/);
+  assert.match(background, /\.\.\.pageNotes\(notes, page\)/);
+});
+
+test("笔记上限可配置，写入守住 7 MB 安全线，并在超过 100 条时分页", () => {
+  const settings = readText("settings.js");
+  const options = readText("options.html");
+  const background = readText("background.js");
+  const sidepanel = readText("sidepanel.js");
+  const html = readText("sidepanel.html");
+  assert.match(settings, /noteLimit: Object\.freeze\(\{ min: 1, max: 400, default: 100 \}\)/);
+  assert.match(options, /id="noteLimit"[^>]*max="400"/);
+  assert.match(background, /NOTE_STORAGE_SAFE_BYTES = 7 \* 1024 \* 1024/);
+  assert.match(background, /function pageNotes\(/);
+  assert.match(sidepanel, /const NOTES_PAGE_SIZE = 100/);
+  assert.match(html, /id="loadMoreNotesBtn"/);
 });
 
 test("侧栏脚本引用的固定节点全部存在，聊天空态不会被消息重绘删除", () => {
